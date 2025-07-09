@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Rolo AI">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#000000">
+    <meta name="application-name" content="Rolo AI">
+    <title>Rolo AI Trading Assistant</title>
+
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #000000; /* Dark background */
+            color: #ffffff; /* White text */
+            margin: 0;
+            padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom) 0; /* Respect safe areas on iOS */
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            overflow: hidden; /* Prevent scrolling on main body */
+        }
+
+        .header {
+            background-color: #1c1c1e; /* Darker grey for header */
+            padding: 15px;
+            text-align: center;
+            font-size: 22px;
+            font-weight: bold;
+            border-bottom: 0.5px solid #38383a; /* Subtle separator */
+            z-index: 10;
+        }
+
+        .content {
+            flex-grow: 1;
+            overflow-y: auto; /* Scrollable content area */
+            -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+            padding: 15px;
+        }
+
+        .tabs {
+            display: flex;
+            justify-content: space-around;
+            background-color: #1c1c1e; /* Darker grey for tab bar */
+            border-top: 0.5px solid #38383a; /* Subtle separator */
+            padding-bottom: env(safe-area-inset-bottom); /* Respect safe areas on iOS */
+            position: sticky;
+            bottom: 0;
+            width: 100%;
+            z-index: 10;
+        }
+
+        .tab-button {
+            flex: 1;
+            padding: 12px 0;
+            background: none;
+            border: none;
+            color: #8e8e93; /* Grey for inactive tabs */
+            font-size: 10px;
+            text-align: center;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .tab-button.active {
+            color: #0a84ff; /* iOS Blue for active tab */
+        }
+
+        .tab-button i {
+            font-size: 22px;
+            margin-bottom: 4px;
+        }
+
+        .tab-content {
+            display: none;
+            padding: 10px 0;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Basic Card Style for content sections */
+        .card {
+            background-color: #2c2c2e; /* Slightly lighter grey for cards */
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+
+        input[type="text"], textarea {
+            width: calc(100% - 20px);
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            border: 1px solid #3a3a3c;
+            background-color: #48484a; /* Input background */
+            color: #ffffff;
+            font-size: 16px;
+        }
+
+        button {
+            background-color: #0a84ff;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        button:active {
+            background-color: #30a4ff; /* Slightly lighter blue on tap */
+        }
+
+        .chat-message {
+            padding: 8px 12px;
+            margin-bottom: 8px;
+            border-radius: 15px;
+            max-width: 80%;
+            word-wrap: break-word;
+            font-size: 15px;
+        }
+
+        .chat-message.user {
+            background-color: #0a84ff; /* iOS blue for user */
+            align-self: flex-end;
+            margin-left: auto;
+        }
+
+        .chat-message.assistant {
+            background-color: #3a3a3c; /* Dark grey for assistant */
+            align-self: flex-start;
+            margin-right: auto;
+        }
+
+        .chat-window {
+            display: flex;
+            flex-direction: column;
+            max-height: calc(100vh - 200px); /* Adjust based on header/footer */
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            padding: 10px;
+            border-radius: 10px;
+            background-color: #1c1c1e;
+        }
+
+        /* Font Awesome for icons */
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    </style>
+</head>
+<body>
+    <div class="header">Rolo AI</div>
+
+    <div class="content">
+        <div id="chatTab" class="tab-content active">
+            <div class="card">
+                <h2>AI Assistant</h2>
+                <div id="chatWindow" class="chat-window">
+                    <div class="chat-message assistant">Hello! I'm Rolo, your AI-powered trading assistant. How can I help you today?</div>
+                </div>
+                <input type="text" id="chatInput" placeholder="Ask Rolo something...">
+                <button onclick="sendMessage()">Send</button>
+            </div>
+        </div>
+
+        <div id="tickerTab" class="tab-content">
+            <div class="card">
+                <h2>Stock Ticker</h2>
+                <input type="text" id="tickerInput" placeholder="Enter stock symbol (e.g., AAPL)">
+                <button onclick="searchStock()">Search</button>
+                <div id="tickerOutput" style="margin-top: 15px;">
+                    <p>Search for a stock to see its real-time data.</p>
+                </div>
+                <h3>My Favorites</h3>
+                <ul id="favoritesList" style="list-style: none; padding: 0;">
+                    <li>No favorites added yet.</li>
+                </ul>
+            </div>
+        </div>
+
+        <div id="analysisTab" class="tab-content">
+            <div class="card">
+                <h2>Analysis</h2>
+                <p>Detailed technical and sentiment analysis will appear here.</p>
+                <div id="analysisOutput" style="margin-top: 15px;"></div>
+            </div>
+        </div>
+
+        <div id="playsTab" class="tab-content">
+            <div class="card">
+                <h2>Smart Plays</h2>
+                <p>AI-generated trading opportunities will be displayed here.</p>
+                <div id="playsOutput" style="margin-top: 15px;"></div>
+            </div>
+        </div>
+
+        <div id="marketTab" class="tab-content">
+            <div class="card">
+                <h2>Market Overview</h2>
+                <p>Real-time market indices and futures will be displayed here.</p>
+                <div id="marketOutput" style="margin-top: 15px;"></div>
+            </div>
+        </div>
+
+        <div id="alertsTab" class="tab-content">
+            <div class="card">
+                <h2>Alerts</h2>
+                <p>Real-time profit alerts and market signals will appear here.</p>
+                <div id="alertsOutput" style="margin-top: 15px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="tabs">
+        <button class="tab-button active" onclick="showTab('chatTab', this)">
+            <i class="fas fa-comment"></i>
+            <span>Chat</span>
+        </button>
+        <button class="tab-button" onclick="showTab('tickerTab', this)">
+            <i class="fas fa-chart-line"></i>
+            <span>Ticker</span>
+        </button>
+        <button class="tab-button" onclick="showTab('analysisTab', this)">
+            <i class="fas fa-magnifying-glass-chart"></i>
+            <span>Analysis</span>
+        </button>
+        <button class="tab-button" onclick="showTab('playsTab', this)">
+            <i class="fas fa-play"></i>
+            <span>Plays</span>
+        </button>
+        <button class="tab-button" onclick="showTab('marketTab', this)">
+            <i class="fas fa-globe"></i>
+            <span>Market</span>
+        </button>
+        <button class="tab-button" onclick="showTab('alertsTab', this)">
+            <i class="fas fa-bell"></i>
+            <span>Alerts</span>
+        </button>
+    </div>
+
+    <script>
+        // Function to switch tabs
+        function showTab(tabId, button) {
+            // Hide all tab contents
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            // Deactivate all tab buttons
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            // Show the selected tab content
+            document.getElementById(tabId).classList.add('active');
+            // Activate the clicked button
+            button.classList.add('active');
+        }
+
+        // --- Placeholder functions for now ---
+        function sendMessage() {
+            const chatInput = document.getElementById('chatInput');
+            const chatWindow = document.getElementById('chatWindow');
+            const messageText = chatInput.value.trim();
+            if (messageText === '') return;
+
+            // Display user message
+            const userMessageDiv = document.createElement('div');
+            userMessageDiv.className = 'chat-message user';
+            userMessageDiv.textContent = messageText;
+            chatWindow.appendChild(userMessageDiv);
+            chatInput.value = '';
+            chatWindow.scrollTop = chatWindow.scrollHeight; // Scroll to bottom
+
+            // Simulate Rolo's response (will be replaced by actual API call)
+            const roloResponseDiv = document.createElement('div');
+            roloResponseDiv.className = 'chat-message assistant';
+            roloResponseDiv.textContent = 'Thinking... (Actual AI response will appear here)';
+            chatWindow.appendChild(roloResponseDiv);
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+
+            // In the next steps, this will call your Netlify function for Gemini
+        }
+
+        function searchStock() {
+            const tickerInput = document.getElementById('tickerInput');
+            const tickerOutput = document.getElementById('tickerOutput');
+            const symbol = tickerInput.value.trim().toUpperCase();
+            if (symbol === '') {
+                tickerOutput.innerHTML = '<p>Please enter a stock symbol.</p>';
+                return;
+            }
+            tickerOutput.innerHTML = `<p>Fetching data for ${symbol}... (This will connect to Alpha Vantage)</p>`;
+            // In the next steps, this will call your Netlify function for Alpha Vantage
+        }
+
+        // Automatically load the chat tab on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            showTab('chatTab', document.querySelector('.tab-button.active'));
+        });
+    </script>
+    <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+</body>
+</html>
