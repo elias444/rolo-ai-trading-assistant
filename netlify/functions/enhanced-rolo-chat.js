@@ -44,7 +44,7 @@ exports.handler = async (event, context) => {
         // Initialize Google Generative AI
         const genAI = new GoogleGenerativeAI(API_KEY);
         // *** IMPORTANT CHANGE HERE: Updated model name ***
-        const model = genAI.getGenerativeModel({ model: "gemini-1.0-pro" });
+        const model = genAI.getGenerativeModel({ model: "gemini-1.0-pro-vision-latest" });
 
         const generationConfig = {
             temperature: 0.7,
