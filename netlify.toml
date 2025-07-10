@@ -1,13 +1,20 @@
 [build]
   command = "echo 'Build complete'"
-  publish = "public"
-  environment = { NODE_VERSION = "18" } # This tells Netlify to use Node.js 18
+  publish = "public" # This specifies where your built website files (like index.html) are located for Netlify to deploy. If your index.html is directly in the root, you might use publish = "." instead.
 
 [functions]
-  node_bundler = "esbuild"
+  directory = "netlify/functions" # This tells Netlify where to find your serverless functions.
+  node_bundler = "esbuild"        # esbuild is generally faster for bundling Node.js functions.
+  # If your Netlify Functions rely on React or ReactDOM (uncommon for backend functions,
+  # but if they somehow import it), this line ensures they are treated as external.
+  # Otherwise, you can remove this line.
   external_node_modules = ["react", "react-dom"]
 
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
+  # This redirect rule is crucial for Single Page Applications (SPAs) like yours.
+  # It ensures that all routes (e.g., /ticker, /chat) are redirected to your
+  # index.html, allowing your client-side routing (React Router or similar)
+  # to handle the actual routing within the app.
