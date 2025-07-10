@@ -1,10 +1,11 @@
 [build]
   command = "echo 'Build complete'"
   publish = "public"
+  environment = { NODE_VERSION = "18" } # This tells Netlify to use Node.js 18
 
 [functions]
-  directory = "netlify/functions"
   node_bundler = "esbuild"
+  external_node_modules = ["react", "react-dom"]
 
 [[redirects]]
   from = "/*"
