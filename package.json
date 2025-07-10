@@ -10,9 +10,7 @@
   "dependencies": {
     "react": "^18.0.0",
     "react-dom": "^18.0.0",
-    "discord.js": "^14.14.1",
-    "@google/generative-ai": "^0.11.0",
-    "node-fetch": "^3.3.0"
+    "discord.js": "^14.14.1"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.0.0",
