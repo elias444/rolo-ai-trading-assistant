@@ -54,8 +54,7 @@ exports.handler = async (event, context) => {
 
         const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
         // Use gemini-pro for general conversational chat
-        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-
+        const model = genAI.getGenerativeModel({ model: "gemini-1.0-pro" });
         // Format the chat history for Gemini API.
         // Gemini's API expects roles 'user' and 'model' and content in 'parts'.
         const formattedHistory = (history || []).map(msg => ({
