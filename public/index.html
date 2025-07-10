@@ -11,6 +11,7 @@
     <meta name="application-name" content="Rolo AI">
     <title>Rolo AI Trading Assistant</title>
 
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -153,9 +154,6 @@
             border-radius: 10px;
             background-color: #1c1c1e;
         }
-
-        /* Font Awesome for icons */
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     </style>
 </head>
 <body>
@@ -249,6 +247,13 @@
     </div>
 
     <script>
+        const chatWindow = document.getElementById('chatWindow');
+        const chatInput = document.getElementById('chatInput');
+        const tickerInput = document.getElementById('tickerInput');
+
+        // Array to store chat history for AI context
+        const chatHistory = [{ type: 'assistant', content: "Hello! I'm Rolo, your AI-powered trading assistant. How can I help you today?" }];
+
         // Function to switch tabs
         function showTab(tabId, button) {
             // Hide all tab contents
@@ -266,46 +271,167 @@
             button.classList.add('active');
         }
 
-        // --- Placeholder functions for now ---
-        function sendMessage() {
-            const chatInput = document.getElementById('chatInput');
-            const chatWindow = document.getElementById('chatWindow');
+        // Scroll chat window to bottom
+        function scrollToBottom() {
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+        }
+
+        // Display message in chat window and add to history
+        function displayMessage(type, content) {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('chat-message', type);
+            const bubbleDiv = document.createElement('div');
+            bubbleDiv.classList.add('chat-message-bubble'); // Changed class to avoid conflict
+            // Basic markdown-like formatting for bold
+            bubbleDiv.innerHTML = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            messageDiv.appendChild(bubbleDiv);
+            chatWindow.appendChild(messageDiv);
+            chatHistory.push({ type, content }); // Add to history
+            scrollToBottom();
+        }
+
+        // Send message to Rolo AI (UPDATED FOR GEMINI)
+        async function sendMessage() {
             const messageText = chatInput.value.trim();
             if (messageText === '') return;
 
-            // Display user message
-            const userMessageDiv = document.createElement('div');
-            userMessageDiv.className = 'chat-message user';
-            userMessageDiv.textContent = messageText;
-            chatWindow.appendChild(userMessageDiv);
-            chatInput.value = '';
-            chatWindow.scrollTop = chatWindow.scrollHeight; // Scroll to bottom
+            displayMessage('user', messageText); // Display user message
+            chatInput.value = ''; // Clear input field
 
-            // Simulate Rolo's response (will be replaced by actual API call)
-            const roloResponseDiv = document.createElement('div');
-            roloResponseDiv.className = 'chat-message assistant';
-            roloResponseDiv.textContent = 'Thinking... (Actual AI response will appear here)';
-            chatWindow.appendChild(roloResponseDiv);
-            chatWindow.scrollTop = chatWindow.scrollHeight;
+            // Add typing indicator
+            const typingIndicatorDiv = document.createElement('div');
+            typingIndicatorDiv.classList.add('chat-message', 'assistant', 'typing-indicator-container');
+            typingIndicatorDiv.innerHTML = `
+                <div class="chat-message-bubble typing-indicator">
+                    <span></span><span></span><span></span>
+                </div>`;
+            chatWindow.appendChild(typingIndicatorDiv);
+            scrollToBottom();
 
-            // In the next steps, this will call your Netlify function for Gemini
+            try {
+                // Call the enhanced-rolo-chat Netlify function for Gemini
+                const response = await fetch('/.netlify/functions/enhanced-rolo-chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        message: messageText,
+                        history: chatHistory // Send the full history for context
+                    }),
+                });
+
+                // Remove typing indicator
+                chatWindow.removeChild(typingIndicatorDiv);
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                displayMessage('assistant', data.response); // Display Rolo AI's response
+
+            } catch (error) {
+                console.error('Error sending message to Rolo AI:', error);
+                // Remove typing indicator if error occurs during fetch
+                const existingTypingIndicator = chatWindow.querySelector('.typing-indicator-container');
+                if (existingTypingIndicator) {
+                    chatWindow.removeChild(existingTypingIndicator);
+                }
+                displayMessage('assistant', `<span style="color: red;">Rolo AI is experiencing an issue: ${error.message}. Please try again later. Make sure your Gemini API key is configured in Netlify.</span>`);
+            }
         }
 
-        function searchStock() {
-            const tickerInput = document.getElementById('tickerInput');
+        // Search Stock function (Ticker Tab) - (UPDATED FOR ALPHA VANTAGE)
+        async function searchStock() {
+            const symbol = tickerInput.value.toUpperCase().trim();
             const tickerOutput = document.getElementById('tickerOutput');
-            const symbol = tickerInput.value.trim().toUpperCase();
-            if (symbol === '') {
-                tickerOutput.innerHTML = '<p>Please enter a stock symbol.</p>';
+
+            if (!symbol) {
+                tickerOutput.innerHTML = '<p style="color: #ff3b30;">Please enter a stock symbol (e.g., AAPL).</p>';
                 return;
             }
-            tickerOutput.innerHTML = `<p>Fetching data for ${symbol}... (This will connect to Alpha Vantage)</p>`;
-            // In the next steps, this will call your Netlify function for Alpha Vantage
+
+            tickerOutput.innerHTML = `<p style="color: #0a84ff;">Fetching real-time data for ${symbol}...</p>`;
+
+            try {
+                // Call your stock-data.js Netlify Function
+                const response = await fetch(`/.netlify/functions/stock-data?symbol=${symbol}`);
+                const data = await response.json();
+
+                if (!response.ok) {
+                    // Handle errors from the Netlify Function
+                    throw new Error(data.message || 'Failed to fetch stock data.');
+                }
+
+                // Display the real-time stock data
+                tickerOutput.innerHTML = `
+                    <div style="margin-top: 15px;">
+                        <h3 style="color: #0a84ff;">${data.symbol} Live Data</h3>
+                        <p><strong>Price:</strong> $${data.price}</p>
+                        <p><strong>Change:</strong> <span style="color: ${data.change >= 0 ? '#34c759' : '#ff3b30'};">${data.change} (${data.changePercent})</span></p>
+                        <p><strong>Volume:</strong> ${data.volume}</p>
+                        <p><strong>High:</strong> $${data.high}</p>
+                        <p><strong>Low:</strong> $${data.low}</p>
+                        <p><strong>Open:</strong> $${data.open}</p>
+                        <p><strong>Previous Close:</strong> $${data.previousClose}</p>
+                        <p style="font-size: 12px; color: #8e8e93;">Last Updated: ${data.lastUpdated} (Source: ${data.source})</p>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error fetching stock data:', error);
+                tickerOutput.innerHTML = `<p style="color: #ff3b30;">Error: ${error.message || 'Could not retrieve stock data.'} Please try again.</p>`;
+            }
         }
+
+        // Placeholder for other tab functions (will be implemented in next steps)
+        function loadMarketDashboard() {
+            document.getElementById('marketOutput').innerHTML = '<p style="color: #0a84ff;">Loading market data... (Will connect to Alpha Vantage)</p>';
+            // Actual fetch call for market-dashboard.js will go here
+        }
+
+        function loadSmartPlays() {
+            document.getElementById('playsOutput').innerHTML = '<p style="color: #0a84ff;">Generating smart plays... (Will connect to smart-plays-generator.js)</p>';
+            // Actual fetch call for smart-plays-generator.js will go here
+        }
+
+        function loadSmartAlerts() {
+            document.getElementById('alertsOutput').innerHTML = '<p style="color: #0a84ff;">Checking for alerts... (Will connect to realtime-alerts.js)</p>';
+            // Actual fetch call for realtime-alerts.js will go here
+        }
+
+        function updateAnalysisTab(ticker, data) {
+            const analysisOutput = document.getElementById('analysisOutput');
+            analysisOutput.innerHTML = `<p style="color: #0a84ff;">Analyzing ${ticker}... (Will provide detailed analysis)</p>`;
+            // This function will be enhanced later to display more detailed analysis
+        }
+
+
+        // Event listeners for input fields
+        chatInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        tickerInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                searchStock();
+            }
+        });
+
+        // Auto-uppercase ticker input
+        tickerInput.addEventListener('input', function(e) {
+            e.target.value = e.target.value.toUpperCase();
+        });
+
 
         // Automatically load the chat tab on page load
         document.addEventListener('DOMContentLoaded', () => {
             showTab('chatTab', document.querySelector('.tab-button.active'));
+            // Initial call to load some data for other tabs if desired, or load on tab switch
+            // For now, they will show their "Loading..." message when clicked.
         });
     </script>
     <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
