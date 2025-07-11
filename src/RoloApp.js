@@ -1,7 +1,6 @@
 // src/RoloApp.js
 import React, { useState, useEffect } from 'react';
-// Assuming your App.css is in src, adjust path if different
-// import './App.css'; 
+import './App.css'; // Import your main CSS file for styling
 
 function RoloApp() {
   // --- State Management ---
@@ -9,10 +8,12 @@ function RoloApp() {
   const [stockData, setStockData] = useState({}); // Stores stock data by symbol
   const [marketData, setMarketData] = useState({}); // Stores overall market data
   const [optionsData, setOptionsData] = useState({}); // Stores options data by symbol+expiration
-  const [chatHistory, setChatHistory] = useState([]); // Stores AI chat messages
+  const [chatHistory, setChatHistory] = useState([
+    { role: 'ai', content: "Hello! I'm Rolo, your AI-powered trading assistant. How can I help you today?" }
+  ]); // Stores AI chat messages, with initial greeting
   const [chatInput, setChatInput] = useState(''); // Input for AI chat
-  const [currentTicker, setCurrentTicker] = useState('AAPL'); // Input for Ticker tab
-  const [optionsSymbol, setOptionsSymbol] = useState('GOOG'); // Input for Options symbol
+  const [currentTicker, setCurrentTicker] = useState('AAPL'); // Input for Ticker tab, default to AAPL
+  const [optionsSymbol, setOptionsSymbol] = useState('GOOG'); // Input for Options symbol, default to GOOG
   const [optionsExpiration, setOptionsExpiration] = useState(''); // Input for Options expiration
 
   // Loading states for various API calls
@@ -38,11 +39,11 @@ function RoloApp() {
         throw new Error(errorMessage);
       }
 
-      if (data.error || data.message?.includes('limited or delayed')) {
-        // Alpha Vantage specific errors or notes
-        console.warn("Alpha Vantage API Note/Warning:", data);
+      // Check for Alpha Vantage specific notes/warnings
+      if (data.Note || data.message?.includes('limited or delayed')) {
+        console.warn("API Note/Warning:", data);
         setter(data); // Still set data, but display a warning
-        setError(data.error || data.message || "Data might be limited or delayed.");
+        setError(data.error || data.Note || data.message || "Data might be limited or delayed.");
       } else {
         setter(data); // Set the received data
       }
@@ -83,7 +84,7 @@ function RoloApp() {
   // Fetches options data for a symbol and expiration
   const fetchOptionsData = async (symbol, expiration) => {
     if (!symbol || !expiration) {
-      setError("Please enter both a symbol and an expiration date for options.");
+      setError("Please enter both a symbol and an expiration date (YYYY-MM-DD) for options.");
       return;
     }
     // Expected format: YYYY-MM-DD
@@ -101,6 +102,7 @@ function RoloApp() {
 
     const userMessage = { role: 'user', content: chatInput.trim() };
     setChatHistory((prev) => [...prev, userMessage]);
+    const currentInput = chatInput.trim(); // Capture current input before clearing
     setChatInput(''); // Clear input immediately
 
     setIsLoadingChat(true);
@@ -112,7 +114,7 @@ function RoloApp() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ message: chatInput.trim() }),
+        body: JSON.stringify({ message: currentInput }), // Send the captured input
       });
 
       const data = await response.json();
@@ -121,12 +123,12 @@ function RoloApp() {
         throw new Error(data.error || 'Failed to get response from AI.');
       }
 
-      const aiMessage = { role: 'ai', content: data.reply };
+      const aiMessage = { role: 'ai', content: data.response }; // Use data.response as per enhanced-rolo-chat.js
       setChatHistory((prev) => [...prev, aiMessage]);
     } catch (err) {
       console.error('AI chat error:', err);
       setError(`AI Chat Error: ${err.message}`);
-      setChatHistory((prev) => [...prev, { role: 'system', content: `Error: ${err.message}` }]);
+      setChatHistory((prev) => [...prev, { role: 'ai', content: `Error: ${err.message}. Please check API key.` }]); // Display error in chat
     } finally {
       setIsLoadingChat(false);
     }
@@ -137,15 +139,20 @@ function RoloApp() {
     setIsLoadingStock(true); // Using stock loading for simplicity, create a new one if needed
     setError(null);
     try {
-      // Example call, replace with actual /.netlify/functions/realtime-alerts or smart-alerts
       const response = await fetch('/.netlify/functions/realtime-alerts'); 
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to fetch alerts.');
-      // Process and set alerts data
-      setError("Alerts functionality is placeholder. Check logs.");
+      
+      // Assuming alerts data is an array of alert objects
+      if (data.alerts && data.alerts.length > 0) {
+        setChatHistory(prev => [...prev, { role: 'ai', content: `**New Alerts:**\n${data.alerts.map(a => `• ${a.title}: ${a.description}`).join('\n')}` }]);
+      } else {
+        setChatHistory(prev => [...prev, { role: 'ai', content: "No real-time alerts at the moment." }]);
+      }
       console.log("Alerts Data:", data);
     } catch (err) {
       setError(`Alerts Error: ${err.message}`);
+      setChatHistory(prev => [...prev, { role: 'ai', content: `Alerts Error: ${err.message}. Check Netlify logs.` }]);
       console.error("Alerts Fetch Error:", err);
     } finally {
       setIsLoadingStock(false);
@@ -157,15 +164,20 @@ function RoloApp() {
     setIsLoadingStock(true); // Using stock loading for simplicity
     setError(null);
     try {
-      // Example call, replace with actual /.netlify/functions/smart-plays-generator
       const response = await fetch('/.netlify/functions/smart-plays-generator'); 
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to fetch plays.');
-      // Process and set plays data
-      setError("Plays functionality is placeholder. Check logs.");
+      
+      // Assuming plays data is an array of play objects
+      if (data.plays && data.plays.length > 0) {
+        setChatHistory(prev => [...prev, { role: 'ai', content: `**New Smart Plays:**\n${data.plays.map(p => `• ${p.title} (${p.ticker}): ${p.description}`).join('\n')}` }]);
+      } else {
+        setChatHistory(prev => [...prev, { role: 'ai', content: "No smart trading plays generated yet." }]);
+      }
       console.log("Plays Data:", data);
     } catch (err) {
       setError(`Plays Error: ${err.message}`);
+      setChatHistory(prev => [...prev, { role: 'ai', content: `Plays Error: ${err.message}. Check Netlify logs.` }]);
       console.error("Plays Fetch Error:", err);
     } finally {
       setIsLoadingStock(false);
@@ -184,6 +196,13 @@ function RoloApp() {
     } else if (activeTab === 'plays') {
       fetchPlaysData(); // Fetch plays when plays tab is active
     }
+    // Scroll chat to bottom when chat tab becomes active
+    if (activeTab === 'chat') {
+      const chatWindow = document.querySelector('.chat-window');
+      if (chatWindow) {
+        chatWindow.scrollTop = chatWindow.scrollHeight;
+      }
+    }
   }, [activeTab]); // Dependency array: re-run when activeTab changes
 
   // Fetch default stock data on initial load of the Ticker tab
@@ -192,6 +211,14 @@ function RoloApp() {
         fetchStockData(currentTicker);
     }
   }, [activeTab, currentTicker, stockData]);
+
+  // Scroll chat window to bottom whenever chat history changes
+  useEffect(() => {
+    const chatWindow = document.querySelector('.chat-window');
+    if (chatWindow) {
+      chatWindow.scrollTop = chatWindow.scrollHeight;
+    }
+  }, [chatHistory]);
 
 
   // --- Render Method (JSX) ---
@@ -229,7 +256,7 @@ function RoloApp() {
             {isLoadingStock ? (
               <p>Loading stock data...</p>
             ) : (
-              stockData[currentTicker] && (
+              stockData[currentTicker] && stockData[currentTicker].symbol ? ( // Check if symbol exists in data
                 <div className="stock-details">
                   <h3>{stockData[currentTicker].symbol}</h3>
                   <p>Price: ${stockData[currentTicker].price}</p>
@@ -243,9 +270,10 @@ function RoloApp() {
                   {/* Display fullRawData for debugging if needed */}
                   {/* <pre>{JSON.stringify(stockData[currentTicker].fullRawData, null, 2)}</pre> */}
                 </div>
+              ) : (
+                <p>Enter a symbol to view its data.</p>
               )
             )}
-            {!stockData[currentTicker] && !isLoadingStock && !error && <p>Enter a symbol to view its data.</p>}
           </div>
         )}
 
@@ -272,7 +300,7 @@ function RoloApp() {
                  {marketData.vix && (
                   <p><strong>VIX:</strong> {marketData.vix.message}</p>
                 )}
-                {!marketData.sp500 && !marketData.dowJones && !marketData.nasdaq && !isLoadingMarket && <p>No market data available.</p>}
+                {!marketData.sp500 && !marketData.dowJones && !marketData.nasdaq && !marketData.wtiOil && !isLoadingMarket && <p>No market data available. Click "Market" tab to refresh.</p>}
               </div>
             )}
           </div>
@@ -299,11 +327,11 @@ function RoloApp() {
             {isLoadingOptions ? (
               <p>Loading options data...</p>
             ) : (
-              optionsData[`${optionsSymbol}-${optionsExpiration}`] ? (
+              optionsData[`${optionsSymbol}-${optionsExpiration}`] && optionsData[`${optionsSymbol}-${optionsExpiration}`].symbol ? ( // Check if data exists
                 <div className="options-details">
                   <h3>Options for {optionsSymbol} (Exp: {optionsExpiration})</h3>
+                  {/* Displaying raw JSON for simplicity. You would parse and display calls/puts in a table here */}
                   <pre>{JSON.stringify(optionsData[`${optionsSymbol}-${optionsExpiration}`], null, 2)}</pre>
-                  {/* You would parse and display calls/puts in a table here */}
                 </div>
               ) : (
                 <p>Enter a symbol and expiration to view options data.</p>
@@ -337,25 +365,25 @@ function RoloApp() {
           </div>
         )}
 
-        {/* Alerts Tab (Placeholder) */}
+        {/* Alerts Tab (Placeholder with function call) */}
         {activeTab === 'alerts' && (
           <div className="tab-content">
             <h2>Real-time Alerts</h2>
             <p>Alerts functionality will go here. Data from `realtime-alerts.js` or `smart-alerts.js`.</p>
             <button onClick={fetchAlertsData}>Fetch Sample Alerts Data</button> {/* For testing the function call */}
             {isLoadingStock && <p>Loading alerts...</p>}
-            {/* Display alerts data */}
+            {/* Display alerts data from chat history or dedicated state */}
           </div>
         )}
 
-        {/* Plays Tab (Placeholder) */}
+        {/* Plays Tab (Placeholder with function call) */}
         {activeTab === 'plays' && (
           <div className="tab-content">
             <h2>Smart Plays Generator</h2>
             <p>Generated trading plays will appear here. Data from `smart-plays-generator.js`.</p>
             <button onClick={fetchPlaysData}>Generate Sample Plays</button> {/* For testing the function call */}
             {isLoadingStock && <p>Generating plays...</p>}
-            {/* Display plays data */}
+            {/* Display plays data from chat history or dedicated state */}
           </div>
         )}
       </main>
