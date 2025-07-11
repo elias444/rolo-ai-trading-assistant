@@ -342,8 +342,11 @@ function RoloApp() {
                 {marketData.vix && (
                   <p><strong>VIX:</strong> {marketData.vix.message}</p>
                 )}
-                {!marketData.sp500 && !marketData.dowJones && !marketData.nasdaq && 
-                 !marketData.wtiOil && !isLoadingMarket && (
+                {(!marketData.sp500 && 
+                  !marketData.dowJones && 
+                  !marketData.nasdaq && 
+                  !marketData.wtiOil && 
+                  !isLoadingMarket) && (
                   <p>No market data available. Click "Market" tab to refresh.</p>
                 )}
               </div>
