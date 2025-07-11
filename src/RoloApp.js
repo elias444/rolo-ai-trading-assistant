@@ -184,7 +184,6 @@ function RoloApp() {
     }
   };
 
-
   // --- useEffect Hooks for Initial Data Loading or Tab Changes ---
 
   // Fetch market data when the component mounts or when 'market' tab is active
@@ -220,19 +219,48 @@ function RoloApp() {
     }
   }, [chatHistory]);
 
-
   // --- Render Method (JSX) ---
   return (
     <div className="App">
       <header className="app-header">
         <h1>Rolo AI Trading Assistant</h1>
         <nav className="nav-tabs">
-          <button onClick={() => setActiveTab('ticker')} className={activeTab === 'ticker' ? 'active' : ''}>Ticker</button>
-          <button onClick={() => setActiveTab('market')} className={activeTab === 'market' ? 'active' : ''}>Market</button>
-          <button onClick={() => setActiveTab('options')} className={activeTab === 'options' ? 'active' : ''}>Options</button>
-          <button onClick={() => setActiveTab('chat')} className={activeTab === 'chat' ? 'active' : ''}>AI Chat</button>
-          <button onClick={() => setActiveTab('alerts')} className={activeTab === 'alerts' ? 'active' : ''}>Alerts</button>
-          <button onClick={() => setActiveTab('plays')} className={activeTab === 'plays' ? 'active' : ''}>Plays</button>
+          <button 
+            onClick={() => setActiveTab('ticker')} 
+            className={activeTab === 'ticker' ? 'active' : ''}
+          >
+            Ticker
+          </button>
+          <button 
+            onClick={() => setActiveTab('market')} 
+            className={activeTab === 'market' ? 'active' : ''}
+          >
+            Market
+          </button>
+          <button 
+            onClick={() => setActiveTab('options')} 
+            className={activeTab === 'options' ? 'active' : ''}
+          >
+            Options
+          </button>
+          <button 
+            onClick={() => setActiveTab('chat')} 
+            className={activeTab === 'chat' ? 'active' : ''}
+          >
+            AI Chat
+          </button>
+          <button 
+            onClick={() => setActiveTab('alerts')} 
+            className={activeTab === 'alerts' ? 'active' : ''}
+          >
+            Alerts
+          </button>
+          <button 
+            onClick={() => setActiveTab('plays')} 
+            className={activeTab === 'plays' ? 'active' : ''}
+          >
+            Plays
+          </button>
         </nav>
       </header>
 
@@ -249,14 +277,18 @@ function RoloApp() {
                 placeholder="Enter stock symbol (e.g., AAPL)"
                 value={currentTicker}
                 onChange={(e) => setCurrentTicker(e.target.value.toUpperCase())}
-                onKeyPress={(e) => { if (e.key === 'Enter') fetchStockData(currentTicker); }}
+                onKeyPress={(e) => { 
+                  if (e.key === 'Enter') fetchStockData(currentTicker); 
+                }}
               />
-              <button onClick={() => fetchStockData(currentTicker)}>Get Stock Data</button>
+              <button onClick={() => fetchStockData(currentTicker)}>
+                Get Stock Data
+              </button>
             </div>
             {isLoadingStock ? (
               <p>Loading stock data...</p>
             ) : (
-              stockData[currentTicker] && stockData[currentTicker].symbol ? ( // Check if symbol exists in data
+              stockData[currentTicker] && stockData[currentTicker].symbol ? (
                 <div className="stock-details">
                   <h3>{stockData[currentTicker].symbol}</h3>
                   <p>Price: ${stockData[currentTicker].price}</p>
@@ -267,8 +299,6 @@ function RoloApp() {
                   <p>Open: ${stockData[currentTicker].open}</p>
                   <p>Previous Close: ${stockData[currentTicker].previousClose}</p>
                   <p>Last Updated: {stockData[currentTicker].lastUpdated}</p>
-                  {/* Display fullRawData for debugging if needed */}
-                  {/* <pre>{JSON.stringify(stockData[currentTicker].fullRawData, null, 2)}</pre> */}
                 </div>
               ) : (
                 <p>Enter a symbol to view its data.</p>
@@ -286,21 +316,36 @@ function RoloApp() {
             ) : (
               <div className="market-details">
                 {marketData.sp500 && (
-                  <p><strong>S&P 500 (SPY):</strong> ${marketData.sp500.price} ({marketData.sp500.change} / {marketData.sp500.changePercent})</p>
+                  <p>
+                    <strong>S&P 500 (SPY):</strong> ${marketData.sp500.price} 
+                    ({marketData.sp500.change} / {marketData.sp500.changePercent})
+                  </p>
                 )}
                 {marketData.dowJones && (
-                  <p><strong>Dow Jones (DIA):</strong> ${marketData.dowJones.price} ({marketData.dowJones.change} / {marketData.dowJones.changePercent})</p>
+                  <p>
+                    <strong>Dow Jones (DIA):</strong> ${marketData.dowJones.price} 
+                    ({marketData.dowJones.change} / {marketData.dowJones.changePercent})
+                  </p>
                 )}
                 {marketData.nasdaq && (
-                  <p><strong>NASDAQ (QQQ):</strong> ${marketData.nasdaq.price} ({marketData.nasdaq.change} / {marketData.nasdaq.changePercent})</p>
+                  <p>
+                    <strong>NASDAQ (QQQ):</strong> ${marketData.nasdaq.price} 
+                    ({marketData.nasdaq.change} / {marketData.nasdaq.changePercent})
+                  </p>
                 )}
                 {marketData.wtiOil && (
-                  <p><strong>WTI Crude Oil:</strong> ${marketData.wtiOil.price} (as of {marketData.wtiOil.date})</p>
+                  <p>
+                    <strong>WTI Crude Oil:</strong> ${marketData.wtiOil.price} 
+                    (as of {marketData.wtiOil.date})
+                  </p>
                 )}
-                 {marketData.vix && (
+                {marketData.vix && (
                   <p><strong>VIX:</strong> {marketData.vix.message}</p>
                 )}
-                {!marketData.sp500 && !marketData.dowJones && !marketData.nasdaq && !marketData.wtiOil && !isLoadingMarket && <p>No market data available. Click "Market" tab to refresh.</p>}
+                {!marketData.sp500 && !marketData.dowJones && !marketData.nasdaq && 
+                 !marketData.wtiOil && !isLoadingMarket && (
+                  <p>No market data available. Click "Market" tab to refresh.</p>
+                )}
               </div>
             )}
           </div>
@@ -318,20 +363,24 @@ function RoloApp() {
                 onChange={(e) => setOptionsSymbol(e.target.value.toUpperCase())}
               />
               <input
-                type="date" // HTML5 date picker
+                type="date"
                 value={optionsExpiration}
                 onChange={(e) => setOptionsExpiration(e.target.value)}
               />
-              <button onClick={() => fetchOptionsData(optionsSymbol, optionsExpiration)}>Get Options Data</button>
+              <button onClick={() => fetchOptionsData(optionsSymbol, optionsExpiration)}>
+                Get Options Data
+              </button>
             </div>
             {isLoadingOptions ? (
               <p>Loading options data...</p>
             ) : (
-              optionsData[`${optionsSymbol}-${optionsExpiration}`] && optionsData[`${optionsSymbol}-${optionsExpiration}`].symbol ? ( // Check if symbol exists in data
+              optionsData[`${optionsSymbol}-${optionsExpiration}`] && 
+              optionsData[`${optionsSymbol}-${optionsExpiration}`].symbol ? (
                 <div className="options-details">
                   <h3>Options for {optionsSymbol} (Exp: {optionsExpiration})</h3>
-                  {/* Displaying raw JSON for simplicity. You would parse and display calls/puts in a table here */}
-                  <pre>{JSON.stringify(optionsData[`${optionsSymbol}-${optionsExpiration}`], null, 2)}</pre>
+                  <pre>
+                    {JSON.stringify(optionsData[`${optionsSymbol}-${optionsExpiration}`], null, 2)}
+                  </pre>
                 </div>
               ) : (
                 <p>Enter a symbol and expiration to view options data.</p>
@@ -350,7 +399,11 @@ function RoloApp() {
                   <strong>{msg.role === 'user' ? 'You:' : 'Rolo:'}</strong> {msg.content}
                 </div>
               ))}
-              {isLoadingChat && <div className="chat-message ai"><strong>Rolo:</strong> Typing...</div>}
+              {isLoadingChat && (
+                <div className="chat-message ai">
+                  <strong>Rolo:</strong> Typing...
+                </div>
+              )}
             </div>
             <div className="chat-input-group">
               <input
@@ -358,32 +411,34 @@ function RoloApp() {
                 placeholder="Ask Rolo a question..."
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
-                onKeyPress={(e) => { if (e.key === 'Enter') handleSendMessage(); }}
+                onKeyPress={(e) => { 
+                  if (e.key === 'Enter') handleSendMessage(); 
+                }}
               />
-              <button onClick={handleSendMessage} disabled={isLoadingChat}>Send</button>
+              <button onClick={handleSendMessage} disabled={isLoadingChat}>
+                Send
+              </button>
             </div>
           </div>
         )}
 
-        {/* Alerts Tab (Placeholder with function call) */}
+        {/* Alerts Tab */}
         {activeTab === 'alerts' && (
           <div className="tab-content">
             <h2>Real-time Alerts</h2>
-            <p>Alerts functionality will go here. Data from `realtime-alerts.js` or `smart-alerts.js`.</p>
-            <button onClick={fetchAlertsData}>Fetch Sample Alerts Data</button> {/* For testing the function call */}
+            <p>Alerts functionality will go here. Data from realtime-alerts.js or smart-alerts.js.</p>
+            <button onClick={fetchAlertsData}>Fetch Sample Alerts Data</button>
             {isLoadingStock && <p>Loading alerts...</p>}
-            {/* Display alerts data from chat history or dedicated state */}
           </div>
         )}
 
-        {/* Plays Tab (Placeholder with function call) */}
+        {/* Plays Tab */}
         {activeTab === 'plays' && (
           <div className="tab-content">
             <h2>Smart Plays Generator</h2>
-            <p>Generated trading plays will appear here. Data from `smart-plays-generator.js`.</p>
-            <button onClick={fetchPlaysData}>Generate Sample Plays</button> {/* For testing the function call */}
+            <p>Generated trading plays will appear here. Data from smart-plays-generator.js.</p>
+            <button onClick={fetchPlaysData}>Generate Sample Plays</button>
             {isLoadingStock && <p>Generating plays...</p>}
-            {/* Display plays data from chat history or dedicated state */}
           </div>
         )}
       </main>
