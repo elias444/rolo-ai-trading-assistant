@@ -1,69 +1,57 @@
 import React, { useState, useEffect } from 'react';
-import './App.css'; // Import your main CSS file for styling
+import './App.css';
 
 function RoloApp() {
-  // --- State Management ---
-  const [activeTab, setActiveTab] = useState('chat'); // Default to 'chat' tab
-  const [stockData, setStockData] = useState({}); // Stores stock data by symbol
-  const [marketData, setMarketData] = useState({}); // Stores overall market data
-  const [optionsData, setOptionsData] = useState({}); // Stores options data by symbol+expiration
-  const [chatHistory, setChatHistory] = useState([
-    { role: 'ai', content: "Hello! I'm Rolo, your AI-powered trading assistant. How can I help you today?" }
-  ]); // Stores AI chat messages, with initial greeting
-  const [chatInput, setChatInput] = useState(''); // Input for AI chat
-  const [currentTicker, setCurrentTicker] = useState('AAPL'); // Input for Ticker tab, default to AAPL
-  const [optionsSymbol, setOptionsSymbol] = useState('GOOG'); // Input for Options symbol, default to GOOG
-  const [optionsExpiration, setOptionsExpiration] = useState(''); // Input for Options expiration
+  const [activeTab, setActiveTab] = useState('chat');
+  const [stockData, setStockData] = useState({});
+  const [marketData, setMarketData] = useState({});
+  const [optionsData, setOptionsData] = useState({});
+  const [chatHistory, setChatHistory] = useState([{ role: 'ai', content: "Hello! I'm Rolo, your AI-powered trading assistant. How can I help you today?" }]);
+  const [chatInput, setChatInput] = useState('');
+  const [currentTicker, setCurrentTicker] = useState('AAPL');
+  const [optionsSymbol, setOptionsSymbol] = useState('GOOG');
+  const [optionsExpiration, setOptionsExpiration] = useState('');
 
-  // Loading states for various API calls
   const [isLoadingStock, setIsLoadingStock] = useState(false);
   const [isLoadingMarket, setIsLoadingMarket] = useState(false);
   const [isLoadingOptions, setIsLoadingOptions] = useState(false);
   const [isLoadingChat, setIsLoadingChat] = useState(false);
-  const [error, setError] = useState(null); // General error message
+  const [error, setError] = useState(null);
 
-  // --- Utility Function for API Calls ---
-  // Helper to handle fetch responses and errors
   const fetchData = async (url, setter, loadingSetter) => {
     loadingSetter(true);
-    setError(null); // Clear previous errors
+    setError(null);
     try {
       const response = await fetch(url);
       const data = await response.json();
 
       if (!response.ok) {
-        // If the server responded with an error status (4xx, 5xx)
         const errorMessage = data.error || `HTTP Error: ${response.status}`;
         console.error("API Error Response:", data);
         throw new Error(errorMessage);
       }
 
-      // Check for Alpha Vantage specific notes/warnings
       if (data.Note || data.message?.includes('limited or delayed')) {
         console.warn("API Note/Warning:", data);
-        setter(data); // Still set data, but display a warning
+        setter(data);
         setError(data.error || data.Note || data.message || "Data might be limited or delayed.");
       } else {
-        setter(data); // Set the received data
+        setter(data);
       }
     } catch (err) {
       console.error("Fetch operation failed:", err);
       setError(`Failed to fetch data: ${err.message}. Please try again.`);
-      setter({}); // Clear data on critical error
+      setter({});
     } finally {
       loadingSetter(false);
     }
   };
 
-  // --- Fetch Functions for Netlify Endpoints ---
-
-  // Fetches detailed stock data for a single symbol
   const fetchStockData = async (symbol) => {
     if (!symbol) {
       setError("Please enter a stock symbol.");
       return;
     }
-    // Using enhanced-stock-data for richer info
     await fetchData(
       `/.netlify/functions/enhanced-stock-data?symbol=${symbol}`,
       (data) => setStockData(prev => ({ ...prev, [symbol]: data })),
@@ -71,7 +59,6 @@ function RoloApp() {
     );
   };
 
-  // Fetches overall market dashboard data
   const fetchMarketData = async () => {
     await fetchData(
       `/.netlify/functions/market-dashboard`,
@@ -80,14 +67,12 @@ function RoloApp() {
     );
   };
 
-  // Fetches options data for a symbol and expiration
   const fetchOptionsData = async (symbol, expiration) => {
     if (!symbol || !expiration) {
       setError("Please enter both a symbol and an expiration date (YYYY-MM-DD) for options.");
       return;
     }
-    // Expected format: YYYY-MM-DD
-    const formattedExpiration = expiration; 
+    const formattedExpiration = expiration;
     await fetchData(
       `/.netlify/functions/options-data?symbol=${symbol}&expiration=${formattedExpiration}`,
       (data) => setOptionsData(prev => ({ ...prev, [`${symbol}-${formattedExpiration}`]: data })),
@@ -95,14 +80,13 @@ function RoloApp() {
     );
   };
 
-  // Handles sending messages to the AI chat
   const handleSendMessage = async () => {
     if (!chatInput.trim()) return;
 
     const userMessage = { role: 'user', content: chatInput.trim() };
     setChatHistory((prev) => [...prev, userMessage]);
-    const currentInput = chatInput.trim(); // Capture current input before clearing
-    setChatInput(''); // Clear input immediately
+    const currentInput = chatInput.trim();
+    setChatInput('');
 
     setIsLoadingChat(true);
     setError(null);
@@ -110,10 +94,8 @@ function RoloApp() {
     try {
       const response = await fetch('/.netlify/functions/enhanced-rolo-chat', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ message: currentInput }), // Send the captured input
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: currentInput }),
       });
 
       const data = await response.json();
@@ -122,27 +104,24 @@ function RoloApp() {
         throw new Error(data.error || 'Failed to get response from AI.');
       }
 
-      const aiMessage = { role: 'ai', content: data.response }; // Use data.response as per enhanced-rolo-chat.js
+      const aiMessage = { role: 'ai', content: data.response };
       setChatHistory((prev) => [...prev, aiMessage]);
     } catch (err) {
       console.error('AI chat error:', err);
       setError(`AI Chat Error: ${err.message}`);
-      setChatHistory((prev) => [...prev, { role: 'ai', content: `Error: ${err.message}. Please check API key.` }]); // Display error in chat
+      setChatHistory((prev) => [...prev, { role: 'ai', content: `Error: ${err.message}. Please check API key.` }]);
     } finally {
       setIsLoadingChat(false);
     }
   };
 
-  // Placeholder for Alerts - you would integrate actual API calls here
   const fetchAlertsData = async () => {
-    setIsLoadingStock(true); // Using stock loading for simplicity, create a new one if needed
+    setIsLoadingStock(true);
     setError(null);
     try {
-      const response = await fetch('/.netlify/functions/realtime-alerts'); 
+      const response = await fetch('/.netlify/functions/realtime-alerts');
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to fetch alerts.');
-      
-      // Assuming alerts data is an array of alert objects
       if (data.alerts && data.alerts.length > 0) {
         setChatHistory(prev => [...prev, { role: 'ai', content: `**New Alerts:**\n${data.alerts.map(a => `• ${a.title}: ${a.description}`).join('\n')}` }]);
       } else {
@@ -158,16 +137,13 @@ function RoloApp() {
     }
   };
 
-  // Placeholder for Plays - you would integrate actual API calls here
   const fetchPlaysData = async () => {
-    setIsLoadingStock(true); // Using stock loading for simplicity
+    setIsLoadingStock(true);
     setError(null);
     try {
-      const response = await fetch('/.netlify/functions/smart-plays-generator'); 
+      const response = await fetch('/.netlify/functions/smart-plays-generator');
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to fetch plays.');
-      
-      // Assuming plays data is an array of play objects
       if (data.plays && data.plays.length > 0) {
         setChatHistory(prev => [...prev, { role: 'ai', content: `**New Smart Plays:**\n${data.plays.map(p => `• ${p.title} (${p.ticker}): ${p.description}`).join('\n')}` }]);
       } else {
@@ -183,34 +159,28 @@ function RoloApp() {
     }
   };
 
-  // --- useEffect Hooks for Initial Data Loading or Tab Changes ---
-
-  // Fetch market data when the component mounts or when 'market' tab is active
   useEffect(() => {
     if (activeTab === 'market') {
       fetchMarketData();
     } else if (activeTab === 'alerts') {
-      fetchAlertsData(); // Fetch alerts when alerts tab is active
+      fetchAlertsData();
     } else if (activeTab === 'plays') {
-      fetchPlaysData(); // Fetch plays when plays tab is active
+      fetchPlaysData();
     }
-    // Scroll chat to bottom when chat tab becomes active
     if (activeTab === 'chat') {
       const chatWindow = document.querySelector('.chat-window');
       if (chatWindow) {
         chatWindow.scrollTop = chatWindow.scrollHeight;
       }
     }
-  }, [activeTab]); // Dependency array: re-run when activeTab changes
+  }, [activeTab]);
 
-  // Fetch default stock data on initial load of the Ticker tab
   useEffect(() => {
     if (activeTab === 'ticker' && currentTicker && !stockData[currentTicker]) {
-        fetchStockData(currentTicker);
+      fetchStockData(currentTicker);
     }
   }, [activeTab, currentTicker, stockData]);
 
-  // Scroll chat window to bottom whenever chat history changes
   useEffect(() => {
     const chatWindow = document.querySelector('.chat-window');
     if (chatWindow) {
@@ -218,7 +188,6 @@ function RoloApp() {
     }
   }, [chatHistory]);
 
-  // --- Render Method (JSX) ---
   return (
     <div className="App">
       <header className="app-header">
@@ -236,7 +205,6 @@ function RoloApp() {
       <main className="app-content">
         {error && <div className="error-message">{error}</div>}
 
-        {/* Ticker Tab */}
         {activeTab === 'ticker' && (
           <div className="tab-content">
             <h2>Stock Ticker</h2>
@@ -264,8 +232,6 @@ function RoloApp() {
                   <p>Open: ${stockData[currentTicker].open}</p>
                   <p>Previous Close: ${stockData[currentTicker].previousClose}</p>
                   <p>Last Updated: {stockData[currentTicker].lastUpdated}</p>
-                  {/* Display fullRawData for debugging if needed */}
-                  {/* <pre>{JSON.stringify(stockData[currentTicker].fullRawData, null, 2)}</pre> */}
                 </div>
               ) : (
                 <p>Enter a symbol to view its data.</p>
@@ -274,7 +240,6 @@ function RoloApp() {
           </div>
         )}
 
-        {/* Market Tab */}
         {activeTab === 'market' && (
           <div className="tab-content">
             <h2>Market Overview</h2>
@@ -282,28 +247,17 @@ function RoloApp() {
               <p>Loading market data...</p>
             ) : (
               <div className="market-details">
-                {marketData.sp500 && (
-                  <p><strong>S&P 500 (SPY):</strong> ${marketData.sp500.price} ({marketData.sp500.change} / {marketData.sp500.changePercent})</p>
-                )}
-                {marketData.dowJones && (
-                  <p><strong>Dow Jones (DIA):</strong> ${marketData.dowJones.price} ({marketData.dowJones.change} / {marketData.dowJones.changePercent})</p>
-                )}
-                {marketData.nasdaq && (
-                  <p><strong>NASDAQ (QQQ):</strong> ${marketData.nasdaq.price} ({marketData.nasdaq.change} / {marketData.nasdaq.changePercent})</p>
-                )}
-                {marketData.wtiOil && (
-                  <p><strong>WTI Crude Oil:</strong> ${marketData.wtiOil.price} (as of {marketData.wtiOil.date})</p>
-                )}
-                {marketData.vix && (
-                  <p><strong>VIX:</strong> {marketData.vix.message}</p>
-                )}
+                {marketData.sp500 && <p><strong>S&P 500 (SPY):</strong> ${marketData.sp500.price} ({marketData.sp500.change} / {marketData.sp500.changePercent})</p>}
+                {marketData.dowJones && <p><strong>Dow Jones (DIA):</strong> ${marketData.dowJones.price} ({marketData.dowJones.change} / {marketData.dowJones.changePercent})</p>}
+                {marketData.nasdaq && <p><strong>NASDAQ (QQQ):</strong> ${marketData.nasdaq.price} ({marketData.nasdaq.change} / {marketData.nasdaq.changePercent})</p>}
+                {marketData.wtiOil && <p><strong>WTI Crude Oil:</strong> ${marketData.wtiOil.price} (as of {marketData.wtiOil.date})</p>}
+                {marketData.vix && <p><strong>VIX:</strong> {marketData.vix.message}</p>}
                 {!marketData.sp500 && !marketData.dowJones && !marketData.nasdaq && !marketData.wtiOil && !isLoadingMarket && <p>No market data available. Click "Market" tab to refresh.</p>}
               </div>
             )}
           </div>
         )}
 
-        {/* Options Tab */}
         {activeTab === 'options' && (
           <div className="tab-content">
             <h2>Options Chain</h2>
@@ -315,7 +269,7 @@ function RoloApp() {
                 onChange={(e) => setOptionsSymbol(e.target.value.toUpperCase())}
               />
               <input
-                type="date" // HTML5 date picker
+                type="date"
                 value={optionsExpiration}
                 onChange={(e) => setOptionsExpiration(e.target.value)}
               />
@@ -327,7 +281,6 @@ function RoloApp() {
               optionsData[`${optionsSymbol}-${optionsExpiration}`] && optionsData[`${optionsSymbol}-${optionsExpiration}`].symbol ? (
                 <div className="options-details">
                   <h3>Options for {optionsSymbol} (Exp: {optionsExpiration})</h3>
-                  {/* Displaying raw JSON for simplicity. You would parse and display calls/puts in a table here */}
                   <pre>{JSON.stringify(optionsData[`${optionsSymbol}-${optionsExpiration}`], null, 2)}</pre>
                 </div>
               ) : (
@@ -337,7 +290,6 @@ function RoloApp() {
           </div>
         )}
 
-        {/* AI Chat Tab */}
         {activeTab === 'chat' && (
           <div className="tab-content chat-tab">
             <h2>AI Assistant</h2>
@@ -362,25 +314,21 @@ function RoloApp() {
           </div>
         )}
 
-        {/* Alerts Tab (Placeholder with function call) */}
         {activeTab === 'alerts' && (
           <div className="tab-content">
             <h2>Real-time Alerts</h2>
             <p>Alerts functionality will go here. Data from `realtime-alerts.js` or `smart-alerts.js`.</p>
-            <button onClick={fetchAlertsData}>Fetch Sample Alerts Data</button> {/* For testing the function call */}
+            <button onClick={fetchAlertsData}>Fetch Sample Alerts Data</button>
             {isLoadingStock && <p>Loading alerts...</p>}
-            {/* Display alerts data from chat history or dedicated state */}
           </div>
         )}
 
-        {/* Plays Tab (Placeholder with function call) */}
         {activeTab === 'plays' && (
           <div className="tab-content">
             <h2>Smart Plays Generator</h2>
             <p>Generated trading plays will appear here. Data from `smart-plays-generator.js`.</p>
-            <button onClick={fetchPlaysData}>Generate Sample Plays</button> {/* For testing the function call */}
+            <button onClick={fetchPlaysData}>Generate Sample Plays</button>
             {isLoadingStock && <p>Generating plays...</p>}
-            {/* Display plays data from chat history or dedicated state */}
           </div>
         )}
       </main>
