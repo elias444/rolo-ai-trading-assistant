@@ -1,4 +1,3 @@
-// src/RoloApp.js
 import React, { useState, useEffect } from 'react';
 import './App.css'; // Import your main CSS file for styling
 
@@ -184,7 +183,6 @@ function RoloApp() {
     }
   };
 
-
   // --- useEffect Hooks for Initial Data Loading or Tab Changes ---
 
   // Fetch market data when the component mounts or when 'market' tab is active
@@ -219,7 +217,6 @@ function RoloApp() {
       chatWindow.scrollTop = chatWindow.scrollHeight;
     }
   }, [chatHistory]);
-
 
   // --- Render Method (JSX) ---
   return (
@@ -256,7 +253,7 @@ function RoloApp() {
             {isLoadingStock ? (
               <p>Loading stock data...</p>
             ) : (
-              stockData[currentTicker] && stockData[currentTicker].symbol ? ( // Check if symbol exists in data
+              stockData[currentTicker] && stockData[currentTicker].symbol ? (
                 <div className="stock-details">
                   <h3>{stockData[currentTicker].symbol}</h3>
                   <p>Price: ${stockData[currentTicker].price}</p>
@@ -297,7 +294,7 @@ function RoloApp() {
                 {marketData.wtiOil && (
                   <p><strong>WTI Crude Oil:</strong> ${marketData.wtiOil.price} (as of {marketData.wtiOil.date})</p>
                 )}
-                 {marketData.vix && (
+                {marketData.vix && (
                   <p><strong>VIX:</strong> {marketData.vix.message}</p>
                 )}
                 {!marketData.sp500 && !marketData.dowJones && !marketData.nasdaq && !marketData.wtiOil && !isLoadingMarket && <p>No market data available. Click "Market" tab to refresh.</p>}
@@ -327,7 +324,7 @@ function RoloApp() {
             {isLoadingOptions ? (
               <p>Loading options data...</p>
             ) : (
-              optionsData[`${optionsSymbol}-${optionsExpiration}`] && optionsData[`${optionsSymbol}-${optionsExpiration}`].symbol ? ( // Check if data exists
+              optionsData[`${optionsSymbol}-${optionsExpiration}`] && optionsData[`${optionsSymbol}-${optionsExpiration}`].symbol ? (
                 <div className="options-details">
                   <h3>Options for {optionsSymbol} (Exp: {optionsExpiration})</h3>
                   {/* Displaying raw JSON for simplicity. You would parse and display calls/puts in a table here */}
