@@ -5,10 +5,7 @@
 [functions]
   directory = "netlify/functions" # This tells Netlify where to find your serverless functions.
   node_bundler = "esbuild"        # esbuild is generally faster for bundling Node.js functions.
-  # If your Netlify Functions rely on React or ReactDOM (uncommon for backend functions,
-  # but if they somehow import it), this line ensures they are treated as external.
-  # Otherwise, you can remove this line.
-  external_node_modules = ["react", "react-dom"]
+  external_node_modules = ["react", "react-dom"] # Ensure these are external for functions if you use them
 
 [[redirects]]
   from = "/*"
