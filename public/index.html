@@ -14,22 +14,17 @@
     
     <title>Rolo AI Trading Assistant</title>
 
-    <!-- Font Awesome for icons (used in RoloApp.js for buttons, etc.) -->
+    <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     
-    <!-- Your main CSS file for the app. In a Vite/React setup, this is typically
-         imported directly into a JS/JSX file (like main.jsx or RoloApp.js)
-         and handled by the build process. You don't link it directly here.
-    -->
+    <!-- Your main CSS file (App.css) is imported by main.jsx, not directly here -->
 </head>
 <body>
     <!-- This is the root element where your React application will be mounted -->
     <div id="root"></div>
 
     <!-- The script tag that loads your main React application entry point.
-         'type="module"' is important for modern JavaScript modules.
-         The path '/src/main.jsx' is for local development. Vite will replace this
-         with the correct bundled path (e.g., '/assets/index-XXXX.js') during build.
+         Vite will replace '/src/main.jsx' with the correct bundled path during build.
     -->
     <script type="module" src="/src/main.jsx"></script>
 </body>
