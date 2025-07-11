@@ -225,8 +225,8 @@ function RoloApp() {
   return (
     <div className="App">
       <header className="app-header">
-        <h1>Rolo AI Trading Assistant</h1>
-        <nav className="nav-tabs">
+    <h1>Rolo AI Trading Assistant</h1>
+    <nav className="nav-tabs">
           <button onClick={() => setActiveTab('ticker')} className={activeTab === 'ticker' ? 'active' : ''}>Ticker</button>
           <button onClick={() => setActiveTab('market')} className={activeTab === 'market' ? 'active' : ''}>Market</button>
           <button onClick={() => setActiveTab('options')} className={activeTab === 'options' ? 'active' : ''}>Options</button>
