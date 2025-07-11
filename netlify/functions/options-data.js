@@ -35,14 +35,6 @@ exports.handler = async (event, context) => {
             };
         }
 
-        // Alpha Vantage options API endpoint (using a placeholder for expiration if not specified)
-        // Note: Alpha Vantage options data API might require specific parameters for premium access
-        // Based on "Realtime Options Premium" documentation:
-        // function=REALTIME_OPTIONS&symbol=IBM&expiration=YYYY-MM-DD&apikey=YOUR_API_KEY
-        // We'll fetch a list of expirations first, then a specific chain if an expiration is provided.
-        // For simplicity, this example will try to fetch a specific expiration if given,
-        // or just list expirations if no specific one is requested.
-
         const expiration = event.queryStringParameters?.expiration; // Optional expiration parameter
 
         if (expiration) {
@@ -86,12 +78,7 @@ exports.handler = async (event, context) => {
             };
 
         } else {
-            // If no specific expiration is provided, try to fetch available expirations or a default chain
-            // Alpha Vantage's REALTIME_OPTIONS might return available expirations without a specific 'expiration' param
-            // or might require it. Check your specific premium API documentation for "REALTIME_OPTIONS" carefully.
-            // As a fallback or initial fetch, you might fetch historical options or just list general data.
-            // For listing expirations, a different function might be needed or trial-and-error with REALTIME_OPTIONS.
-            // For this example, we'll return a message suggesting to provide an expiration.
+            // If no specific expiration is provided, return an error asking for it
             console.warn(`[options-data.js] No expiration date provided for ${symbol}. Please provide a specific expiration (YYYY-MM-DD).`);
             return {
                 statusCode: 400,
