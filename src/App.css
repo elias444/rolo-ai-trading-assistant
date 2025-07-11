@@ -1,0 +1,216 @@
+/* src/App.css */
+body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background-color: #f4f7f6;
+    color: #333;
+}
+
+.App {
+    text-align: center;
+    max-width: 900px;
+    margin: 20px auto;
+    background-color: #fff;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+}
+
+.app-header {
+    background-color: #007bff;
+    color: white;
+    padding: 20px;
+    border-bottom: 5px solid #0056b3;
+}
+
+.app-header h1 {
+    margin: 0 0 15px 0;
+    font-size: 2em;
+}
+
+.nav-tabs {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap; /* Allows tabs to wrap on smaller screens */
+    gap: 10px;
+}
+
+.nav-tabs button {
+    background-color: #0056b3;
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1em;
+    transition: background-color 0.3s ease;
+}
+
+.nav-tabs button:hover:not(.active) {
+    background-color: #004085;
+}
+
+.nav-tabs button.active {
+    background-color: #28a745;
+    font-weight: bold;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.app-content {
+    padding: 20px;
+    text-align: left;
+}
+
+.tab-content {
+    padding: 15px;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    background-color: #fafafa;
+}
+
+.tab-content h2 {
+    color: #007bff;
+    margin-top: 0;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.input-group {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.input-group input[type="text"],
+.input-group input[type="date"] {
+    flex: 1; /* Allow inputs to grow */
+    min-width: 150px; /* Minimum width for inputs */
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 1em;
+}
+
+.input-group button {
+    padding: 10px 20px;
+    background-color: #28a745;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1em;
+    transition: background-color 0.3s ease;
+}
+
+.input-group button:hover {
+    background-color: #218838;
+}
+
+.stock-details, .market-details, .options-details {
+    background-color: #e9ecef;
+    padding: 15px;
+    border-radius: 5px;
+    line-height: 1.6;
+    white-space: pre-wrap; /* For options raw JSON */
+    word-break: break-all; /* For long JSON strings */
+}
+
+.stock-details h3, .market-details h3 {
+    color: #007bff;
+    margin-top: 0;
+}
+
+.error-message {
+    color: #dc3545;
+    background-color: #f8d7da;
+    border: 1px solid #f5c6cb;
+    padding: 10px;
+    margin-bottom: 20px;
+    border-radius: 5px;
+    text-align: center;
+}
+
+/* Chat Specific Styles */
+.chat-tab {
+    display: flex;
+    flex-direction: column;
+    height: 500px; /* Fixed height for chat window */
+}
+
+.chat-window {
+    flex-grow: 1;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 15px;
+    overflow-y: auto;
+    margin-bottom: 15px;
+    background-color: #fff;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.chat-message {
+    padding: 8px 12px;
+    border-radius: 15px;
+    max-width: 80%;
+    word-wrap: break-word;
+}
+
+.chat-message.user {
+    background-color: #e0f7fa;
+    align-self: flex-end;
+    text-align: right;
+    margin-left: auto;
+}
+
+.chat-message.ai {
+    background-color: #e9f5e9;
+    align-self: flex-start;
+    text-align: left;
+    margin-right: auto;
+}
+
+.chat-input-group {
+    display: flex;
+    gap: 10px;
+}
+
+.chat-input-group input {
+    flex-grow: 1;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+}
+
+.chat-input-group button {
+    padding: 10px 15px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+.chat-input-group button:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+}
+
+/* Responsive adjustments */
+@media (max-width: 600px) {
+    .nav-tabs button,
+    .input-group input,
+    .input-group button {
+        width: 100%;
+        margin-right: 0;
+    }
+    .input-group {
+        flex-direction: column;
+    }
+}
