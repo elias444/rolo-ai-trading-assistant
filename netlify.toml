@@ -1,6 +1,6 @@
 [build]
-  command = "echo 'Build complete'"
-  publish = "public" # This specifies where your built website files (like index.html) are located for Netlify to deploy. If your index.html is directly in the root, you might use publish = "." instead.
+  command = "npm run build" # This tells Netlify to run the "build" script defined in your package.json
+  publish = "dist"          # This tells Netlify that the compiled website files will be in a folder named 'dist' after the build.
 
 [functions]
   directory = "netlify/functions" # This tells Netlify where to find your serverless functions.
