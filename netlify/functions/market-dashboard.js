@@ -29,8 +29,6 @@ exports.handler = async (event, context) => {
         const marketData = {};
 
         // --- Fetch S&P 500 (GSPC) ---
-        // VIX is based on S&P 500 options, but Alpha Vantage doesn't have a direct VIX function.
-        // We'll use GLOBAL_QUOTE for major indices.
         const spxUrl = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=SPY&entitlement=realtime&apikey=${API_KEY}`; // SPY ETF often used as proxy for S&P 500
         console.log(`[market-dashboard.js] Calling Alpha Vantage for SPY: ${spxUrl.replace(API_KEY, 'YOUR_API_KEY')}`);
         const spxResponse = await fetch(spxUrl);
@@ -98,13 +96,11 @@ exports.handler = async (event, context) => {
                 symbol: 'WTI Crude Oil',
                 price: parseFloat(latest.value).toFixed(2),
                 date: latest.date
-                // Alpha Vantage commodity APIs might not offer 'change' directly in this format
             };
         } else {
             console.warn(`[market-dashboard.js] Could not fetch WTI Oil data:`, wtiOilData);
             marketData.wtiOil = { error: 'Could not fetch WTI Oil data' };
         }
-
 
         // IMPORTANT: Alpha Vantage generally doesn't provide direct VIX index data through GLOBAL_QUOTE
         // It provides VIX-related APIs under "Alpha Intelligence™" like 'Top Gainers & Losers' etc.
