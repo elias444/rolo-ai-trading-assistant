@@ -8,6 +8,7 @@ body {
     -moz-osx-font-smoothing: grayscale;
     background-color: #f4f7f6;
     color: #333;
+    line-height: 1.6;
 }
 
 .App {
@@ -37,6 +38,8 @@ body {
     justify-content: center;
     flex-wrap: wrap; /* Allows tabs to wrap on smaller screens */
     gap: 10px;
+    padding: 10px;
+    background-color: #007bff; /* Match header background */
 }
 
 .nav-tabs button {
@@ -48,6 +51,8 @@ body {
     cursor: pointer;
     font-size: 1em;
     transition: background-color 0.3s ease;
+    flex-grow: 1; /* Allow buttons to fill space */
+    min-width: 80px; /* Minimum width for each button */
 }
 
 .nav-tabs button:hover:not(.active) {
@@ -70,6 +75,7 @@ body {
     border: 1px solid #eee;
     border-radius: 8px;
     background-color: #fafafa;
+    margin-bottom: 20px; /* Space between tab contents if they were stacked */
 }
 
 .tab-content h2 {
@@ -177,40 +183,4 @@ body {
     margin-right: auto;
 }
 
-.chat-input-group {
-    display: flex;
-    gap: 10px;
-}
-
-.chat-input-group input {
-    flex-grow: 1;
-    padding: 10px;
-    border: 1px solid #ddd;
-    border-radius: 5px;
-}
-
-.chat-input-group button {
-    padding: 10px 15px;
-    background-color: #007bff;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-}
-.chat-input-group button:disabled {
-    background-color: #cccccc;
-    cursor: not-allowed;
-}
-
-/* Responsive adjustments */
-@media (max-width: 600px) {
-    .nav-tabs button,
-    .input-group input,
-    .input-group button {
-        width: 100%;
-        margin-right: 0;
-    }
-    .input-group {
-        flex-direction: column;
-    }
-}
+.chat-
