@@ -225,8 +225,8 @@ function RoloApp() {
   return (
     <div className="App">
       <header className="app-header">
-    <h1>Rolo AI Trading Assistant</h1>
-    <nav className="nav-tabs">
+        <h1>Rolo AI Trading Assistant</h1>
+        <nav className="nav-tabs">
           <button onClick={() => setActiveTab('ticker')} className={activeTab === 'ticker' ? 'active' : ''}>Ticker</button>
           <button onClick={() => setActiveTab('market')} className={activeTab === 'market' ? 'active' : ''}>Market</button>
           <button onClick={() => setActiveTab('options')} className={activeTab === 'options' ? 'active' : ''}>Options</button>
@@ -327,7 +327,7 @@ function RoloApp() {
             {isLoadingOptions ? (
               <p>Loading options data...</p>
             ) : (
-              optionsData[`${optionsSymbol}-${optionsExpiration}`] && optionsData[`${optionsSymbol}-${optionsExpiration}`].symbol ? ( // Check if data exists
+              optionsData[`${optionsSymbol}-${optionsExpiration}`] && optionsData[`${optionsSymbol}-${optionsExpiration}`].symbol ? ( // Check if symbol exists in data
                 <div className="options-details">
                   <h3>Options for {optionsSymbol} (Exp: {optionsExpiration})</h3>
                   {/* Displaying raw JSON for simplicity. You would parse and display calls/puts in a table here */}
