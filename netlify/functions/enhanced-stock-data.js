@@ -51,7 +51,7 @@ exports.handler = async (event, context) => {
             return {
                 statusCode: 500,
                 headers,
-                body: JSON.stringify({ error: `Alpha Vantage Intraday API error: ${dataIntraday['Error Message']}` })
+                body: JSON.stringify({ error: `Alpha Vantage Intraday API error: ${dataIntraday['Error Message']}. Please ensure your key has options entitlement.` })
             };
         }
         if (dataIntraday['Note']) {
@@ -111,10 +111,6 @@ exports.handler = async (event, context) => {
             changePercent: latestQuote['10. change percent'] || '0.00%', // Global Quote has change percent
             lastUpdated: latestQuote['07. latest trading day'] || latestQuote['timestamp'], // Global Quote has latest trading day
             isRealTime: true, // Assuming realtime entitlement is enabled
-            // You can add more derived metrics or indicators here
-            // e.g., 'Moving Averages', 'RSI', etc., by making more Alpha Vantage calls
-            // Example for future: fetch technical indicators like SMA
-            // technicalIndicators: await fetchTechnicalIndicator(symbol, 'SMA', API_KEY),
             fullRawData: dataIntraday // Include full raw data for debugging/more detailed display
         };
 
@@ -137,19 +133,3 @@ exports.handler = async (event, context) => {
         };
     }
 };
-
-// Helper function example for fetching technical indicators (uncomment and integrate if needed)
-/*
-async function fetchTechnicalIndicator(symbol, indicator, apiKey) {
-    try {
-        const url = `https://www.alphavantage.co/query?function=${indicator}&symbol=${symbol}&interval=daily&time_period=10&series_type=close&apikey=${apiKey}`;
-        const response = await fetch(url);
-        const data = await response.json();
-        // Process and return relevant indicator data
-        return data;
-    } catch (error) {
-        console.error(`Error fetching ${indicator} for ${symbol}:`, error);
-        return null;
-    }
-}
-*/
