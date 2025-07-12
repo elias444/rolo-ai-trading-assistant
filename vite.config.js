@@ -8,7 +8,7 @@ export default defineConfig({
       jsxRuntime: 'automatic',
     }),
   ],
-  base: '/',
+  base: '/', // Fixes path issues in production
   build: {
     rollupOptions: {
       input: 'public/index.html',
