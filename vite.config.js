@@ -8,7 +8,7 @@ export default defineConfig({
       jsxRuntime: 'automatic',
     }),
   ],
-  base: '/', // Fixes path issues in production
+  base: '/',
   build: {
     outDir: 'dist',
   },
