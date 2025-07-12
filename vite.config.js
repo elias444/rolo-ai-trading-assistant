@@ -10,9 +10,6 @@ export default defineConfig({
   ],
   base: '/', // Fixes path issues in production
   build: {
-    rollupOptions: {
-      input: 'public/index.html',
-    },
     outDir: 'dist',
   },
   server: {
