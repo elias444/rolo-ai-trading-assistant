@@ -10,7 +10,7 @@ export default defineConfig({
   ],
   base: '/',
   build: {
-    outDir: 'dist', // Ensure this matches Netlify's publish directory
+    outDir: 'dist',
   },
   server: {
     proxy: {
