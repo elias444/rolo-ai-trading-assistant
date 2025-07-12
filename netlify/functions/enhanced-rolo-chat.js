@@ -35,7 +35,7 @@ exports.handler = async (event, context) => {
                 statusCode: 500,
                 headers,
                 body: JSON.stringify({ error: 'AI service configuration error. Please contact support.' })
-            });
+            });;
         }
         const genAI = new GoogleGenerativeAI(API_KEY);
 
