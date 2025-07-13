@@ -1,222 +1,250 @@
-/* src/App.css */
+/* iOS-Style Rolo Trading App CSS */
+* {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 body {
-    margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    background-color: #f4f7f6;
-    color: #333;
-    line-height: 1.6;
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #000;
+  color: #fff;
+  overflow-x: hidden;
+  position: fixed;
+  width: 100%;
+  height: 100%;
 }
 
-.App {
-    text-align: center;
-    max-width: 900px;
-    margin: 20px auto;
-    background-color: #fff;
-    border-radius: 10px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    overflow: hidden;
+#root {
+  height: 100%;
+  overflow: hidden;
 }
 
-.app-header {
-    background-color: #007bff;
-    color: white;
-    padding: 20px;
-    border-bottom: 5px solid #0056b3;
+/* Smooth scrolling for iOS */
+.overflow-y-auto {
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
-.app-header h1 {
-    margin: 0 0 15px 0;
-    font-size: 2em;
+.overflow-y-auto::-webkit-scrollbar {
+  display: none;
 }
 
-.nav-tabs {
-    display: flex;
-    justify-content: center;
-    flex-wrap: wrap; /* Allows tabs to wrap on smaller screens */
-    gap: 10px;
-    padding: 10px;
-    background-color: #007bff; /* Match header background */
+/* iOS-style buttons */
+button {
+  -webkit-appearance: none;
+  appearance: none;
+  touch-action: manipulation;
 }
 
-.nav-tabs button {
-    background-color: #0056b3;
-    color: white;
-    border: none;
-    padding: 10px 15px;
-    border-radius: 5px;
-    cursor: pointer;
-    font-size: 1em;
-    transition: background-color 0.3s ease;
-    flex-grow: 1; /* Allow buttons to fill space */
-    min-width: 80px; /* Minimum width for each button */
+/* Input styling */
+input {
+  -webkit-appearance: none;
+  appearance: none;
+  font-size: 16px; /* Prevents zoom on iOS */
 }
 
-.nav-tabs button:hover:not(.active) {
-    background-color: #004085;
+/* Animations */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 
-.nav-tabs button.active {
-    background-color: #28a745;
-    font-weight: bold;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-.app-content {
-    padding: 20px;
-    text-align: left;
+/* Glass morphism effects */
+.glass {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.tab-content {
-    padding: 15px;
-    border: 1px solid #eee;
-    border-radius: 8px;
-    background-color: #fafafa;
-    margin-bottom: 20px; /* Space between tab contents if they were stacked */
+/* iOS-style transitions */
+* {
+  transition: all 0.2s ease-out;
 }
 
-.tab-content h2 {
-    color: #007bff;
-    margin-top: 0;
-    margin-bottom: 20px;
-    text-align: center;
+/* Safe area for notched devices */
+.safe-top {
+  padding-top: env(safe-area-inset-top);
 }
 
-.input-group {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 20px;
-    flex-wrap: wrap;
-    justify-content: center;
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
-.input-group input[type="text"],
-.input-group input[type="date"] {
-    flex: 1; /* Allow inputs to grow */
-    min-width: 150px; /* Minimum width for inputs */
-    padding: 10px;
-    border: 1px solid #ddd;
-    border-radius: 5px;
-    font-size: 1em;
+/* Bottom navigation specific */
+.fixed.bottom-0 {
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
-.input-group button {
-    padding: 10px 20px;
-    background-color: #28a745;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    font-size: 1em;
-    transition: background-color 0.3s ease;
+/* Responsive grid adjustments */
+@media (max-width: 375px) {
+  .grid-cols-3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
-.input-group button:hover {
-    background-color: #218838;
+/* Touch feedback */
+button:active {
+  transform: scale(0.98);
+  opacity: 0.9;
 }
 
-.stock-details, .market-details, .options-details {
-    background-color: #e9ecef;
-    padding: 15px;
-    border-radius: 5px;
-    line-height: 1.6;
-    white-space: pre-wrap; /* For options raw JSON */
-    word-break: break-all; /* For long JSON strings */
+/* iOS-style rounded corners */
+.rounded-xl {
+  border-radius: 20px;
 }
 
-.stock-details h3, .market-details h3 {
-    color: #007bff;
-    margin-top: 0;
+.rounded-2xl {
+  border-radius: 24px;
 }
 
-.error-message {
-    color: #dc3545;
-    background-color: #f8d7da;
-    border: 1px solid #f5c6cb;
-    padding: 10px;
-    margin-bottom: 20px;
-    border-radius: 5px;
-    text-align: center;
+.rounded-full {
+  border-radius: 9999px;
 }
 
-/* Chat Specific Styles */
-.chat-tab {
-    display: flex;
-    flex-direction: column;
-    height: 500px; /* Fixed height for chat window */
+/* Status bar colors */
+@supports (padding-top: env(safe-area-inset-top)) {
+  .bg-gradient-to-b {
+    padding-top: calc(1rem + env(safe-area-inset-top));
+  }
 }
 
-.chat-window {
-    flex-grow: 1;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    padding: 15px;
-    overflow-y: auto;
-    margin-bottom: 15px;
-    background-color: #fff;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
+/* Chat bubbles */
 .chat-message {
-    padding: 8px 12px;
-    border-radius: 15px;
-    max-width: 80%;
-    word-wrap: break-word;
+  animation: slideIn 0.3s ease-out;
 }
 
-.chat-message.user {
-    background-color: #e0f7fa;
-    align-self: flex-end;
-    text-align: right;
-    margin-left: auto;
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.chat-message.ai {
-    background-color: #e9f5e9;
-    align-self: flex-start;
-    text-align: left;
-    margin-right: auto;
+/* Loading states */
+.loading {
+  position: relative;
+  overflow: hidden;
 }
 
-.chat-input-group {
-    display: flex;
-    gap: 10px;
+.loading::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.1),
+    transparent
+  );
+  animation: shimmer 2s infinite;
 }
 
-.chat-input-group input {
-    flex-grow: 1;
-    padding: 10px;
-    border: 1px solid #ddd;
-    border-radius: 5px;
+@keyframes shimmer {
+  100% {
+    left: 100%;
+  }
 }
 
-.chat-input-group button {
-    padding: 10px 15px;
-    background-color: #007bff;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-}
-.chat-input-group button:disabled {
-    background-color: #cccccc;
-    cursor: not-allowed;
+/* Stock price animations */
+.price-change-positive {
+  animation: flashGreen 0.5s ease-out;
 }
 
-/* Responsive adjustments */
-@media (max-width: 600px) {
-    .nav-tabs button,
-    .input-group input,
-    .input-group button {
-        width: 100%;
-        margin-right: 0;
-    }
-    .input-group {
-        flex-direction: column;
-    }
+.price-change-negative {
+  animation: flashRed 0.5s ease-out;
+}
+
+@keyframes flashGreen {
+  0% { background-color: rgba(34, 197, 94, 0.2); }
+  100% { background-color: transparent; }
+}
+
+@keyframes flashRed {
+  0% { background-color: rgba(239, 68, 68, 0.2); }
+  100% { background-color: transparent; }
+}
+
+/* Tab navigation */
+.nav-tab {
+  position: relative;
+}
+
+.nav-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  background-color: #3b82f6;
+  border-radius: 50%;
+}
+
+/* Responsive typography */
+@media (max-width: 640px) {
+  .text-3xl {
+    font-size: 1.875rem;
+  }
+  
+  .text-2xl {
+    font-size: 1.5rem;
+  }
+  
+  .text-xl {
+    font-size: 1.25rem;
+  }
+}
+
+/* Dark mode optimizations */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+  }
+}
+
+/* Haptic feedback simulation */
+@supports (backdrop-filter: blur(10px)) {
+  .vibrate {
+    animation: vibrate 0.1s linear;
+  }
+}
+
+@keyframes vibrate {
+  0% { transform: translateX(0); }
+  25% { transform: translateX(-1px); }
+  75% { transform: translateX(1px); }
+  100% { transform: translateX(0); }
+}
+
+/* iOS bounce effect */
+.bounce {
+  animation: bounce 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
 }
