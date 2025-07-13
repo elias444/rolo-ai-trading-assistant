@@ -16,12 +16,297 @@ const RoloApp = () => {
 
   const popularStocks = ['AAPL', 'TSLA', 'NVDA', 'SPY', 'QQQ', 'META', 'AMD', 'GOOGL', 'MSFT'];
 
+  // Styles
+  const styles = {
+    app: {
+      minHeight: '100vh',
+      backgroundColor: '#000000',
+      color: '#ffffff',
+      display: 'flex',
+      flexDirection: 'column',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif',
+    },
+    header: {
+      background: 'linear-gradient(to bottom, #1a1a1a, #000000)',
+      padding: '20px',
+      textAlign: 'center',
+    },
+    title: {
+      fontSize: '32px',
+      fontWeight: 'bold',
+      color: '#3B82F6',
+      margin: '0 0 8px 0',
+    },
+    subtitle: {
+      color: '#9CA3AF',
+      fontSize: '14px',
+      margin: '0',
+    },
+    marketStatus: {
+      marginTop: '8px',
+      fontSize: '12px',
+    },
+    marketStatusBadge: {
+      display: 'inline-flex',
+      alignItems: 'center',
+      padding: '4px 12px',
+      borderRadius: '9999px',
+      fontSize: '12px',
+    },
+    marketStatusDot: {
+      width: '8px',
+      height: '8px',
+      borderRadius: '50%',
+      marginRight: '8px',
+      animation: 'pulse 2s infinite',
+    },
+    content: {
+      flex: 1,
+      overflowY: 'auto',
+      paddingBottom: '80px',
+    },
+    searchContainer: {
+      padding: '20px',
+    },
+    searchBar: {
+      display: 'flex',
+      gap: '8px',
+    },
+    searchInput: {
+      flex: 1,
+      backgroundColor: '#1a1a1a',
+      border: '1px solid #374151',
+      borderRadius: '12px',
+      padding: '12px 16px',
+      color: '#ffffff',
+      fontSize: '16px',
+      outline: 'none',
+    },
+    searchButton: {
+      backgroundColor: '#3B82F6',
+      color: '#ffffff',
+      border: 'none',
+      borderRadius: '12px',
+      padding: '12px 24px',
+      fontWeight: '600',
+      cursor: 'pointer',
+      transition: 'background-color 0.2s',
+    },
+    stocksSection: {
+      marginBottom: '24px',
+    },
+    sectionTitle: {
+      fontSize: '18px',
+      fontWeight: '600',
+      marginBottom: '12px',
+      display: 'flex',
+      alignItems: 'center',
+    },
+    stockGrid: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(3, 1fr)',
+      gap: '12px',
+    },
+    stockCard: {
+      backgroundColor: '#1a1a1a',
+      border: '1px solid #374151',
+      borderRadius: '12px',
+      padding: '12px',
+      textAlign: 'center',
+      cursor: 'pointer',
+      transition: 'all 0.2s',
+    },
+    stockCardActive: {
+      backgroundColor: '#1a1a1a',
+      border: '1px solid #3B82F6',
+      borderRadius: '12px',
+      padding: '12px',
+      textAlign: 'center',
+      cursor: 'pointer',
+    },
+    stockSymbol: {
+      fontWeight: 'bold',
+      marginBottom: '4px',
+    },
+    stockPrice: {
+      fontSize: '14px',
+      color: '#9CA3AF',
+      marginBottom: '2px',
+    },
+    stockChange: {
+      fontSize: '12px',
+    },
+    stockDetails: {
+      backgroundColor: '#1a1a1a',
+      borderRadius: '20px',
+      padding: '24px',
+      border: '1px solid #1F2937',
+    },
+    stockDetailsHeader: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      marginBottom: '16px',
+    },
+    stockDetailsTitle: {
+      fontSize: '32px',
+      fontWeight: 'bold',
+      margin: '0',
+    },
+    stockDetailsStatus: {
+      color: '#9CA3AF',
+      fontSize: '14px',
+      margin: '4px 0 0 0',
+    },
+    stockDetailsPrice: {
+      textAlign: 'right',
+    },
+    stockDetailsPriceValue: {
+      fontSize: '32px',
+      fontWeight: 'bold',
+      color: '#10B981',
+      margin: '0',
+    },
+    stockDetailsChange: {
+      fontSize: '14px',
+      marginTop: '4px',
+    },
+    metricsGrid: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(2, 1fr)',
+      gap: '16px',
+      marginTop: '24px',
+    },
+    metricCard: {
+      backgroundColor: '#000000',
+      borderRadius: '12px',
+      padding: '16px',
+    },
+    metricLabel: {
+      color: '#9CA3AF',
+      fontSize: '14px',
+      marginBottom: '4px',
+    },
+    metricValue: {
+      fontSize: '20px',
+      fontWeight: '600',
+    },
+    bottomNav: {
+      position: 'fixed',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      backgroundColor: '#1a1a1a',
+      borderTop: '1px solid #374151',
+      padding: '8px 0',
+      paddingBottom: 'env(safe-area-inset-bottom, 8px)',
+    },
+    navContainer: {
+      display: 'flex',
+      justifyContent: 'space-around',
+      alignItems: 'center',
+    },
+    navButton: {
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '8px 12px',
+      background: 'none',
+      border: 'none',
+      cursor: 'pointer',
+      color: '#9CA3AF',
+    },
+    navButtonActive: {
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '8px 12px',
+      background: 'none',
+      border: 'none',
+      cursor: 'pointer',
+      color: '#3B82F6',
+    },
+    navLabel: {
+      fontSize: '12px',
+      marginTop: '4px',
+    },
+    chatContainer: {
+      display: 'flex',
+      flexDirection: 'column',
+      height: 'calc(100vh - 200px)',
+      padding: '20px',
+    },
+    chatWindow: {
+      flex: 1,
+      overflowY: 'auto',
+      marginBottom: '16px',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '12px',
+    },
+    chatMessage: {
+      maxWidth: '70%',
+      padding: '12px 16px',
+      borderRadius: '18px',
+      wordWrap: 'break-word',
+    },
+    chatMessageUser: {
+      backgroundColor: '#3B82F6',
+      color: '#ffffff',
+      alignSelf: 'flex-end',
+      marginLeft: 'auto',
+    },
+    chatMessageAI: {
+      backgroundColor: '#374151',
+      color: '#E5E7EB',
+      alignSelf: 'flex-start',
+      marginRight: 'auto',
+    },
+    chatInputContainer: {
+      display: 'flex',
+      gap: '8px',
+    },
+    chatInput: {
+      flex: 1,
+      backgroundColor: '#1a1a1a',
+      border: '1px solid #374151',
+      borderRadius: '24px',
+      padding: '12px 20px',
+      color: '#ffffff',
+      fontSize: '16px',
+      outline: 'none',
+    },
+    chatSendButton: {
+      backgroundColor: '#3B82F6',
+      color: '#ffffff',
+      border: 'none',
+      borderRadius: '24px',
+      padding: '12px 24px',
+      cursor: 'pointer',
+      fontWeight: '600',
+    },
+  };
+
+  // Add keyframes for animations
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+      }
+    `;
+    document.head.appendChild(style);
+    return () => document.head.removeChild(style);
+  }, []);
+
   // Check market status
   useEffect(() => {
     const checkMarketStatus = () => {
       const now = new Date();
       const hours = now.getUTCHours() - 5; // EST
-      const minutes = now.getMinutes();
       const day = now.getDay();
       
       if (day === 0 || day === 6) {
@@ -50,7 +335,6 @@ const RoloApp = () => {
       const data = await response.json();
       if (response.ok) {
         setStockData(prev => ({ ...prev, [symbol]: data }));
-        // Generate mock analysis data
         generateAnalysis(symbol, data);
       }
     } catch (error) {
@@ -60,7 +344,7 @@ const RoloApp = () => {
     }
   };
 
-  // Generate analysis (mock for now)
+  // Generate analysis
   const generateAnalysis = (symbol, data) => {
     const price = parseFloat(data.price);
     const technicalScore = Math.floor(Math.random() * 30) + 70;
@@ -83,7 +367,6 @@ const RoloApp = () => {
     if (selectedStock) {
       fetchStockData(selectedStock);
     }
-    // Fetch data for popular stocks
     popularStocks.forEach(symbol => {
       if (!stockData[symbol]) {
         fetchStockData(symbol);
@@ -118,241 +401,241 @@ const RoloApp = () => {
     }
   };
 
-  const TabIcon = ({ name, label, isActive }) => {
-    const icons = {
-      chat: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-        </svg>
-      ),
-      ticker: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-        </svg>
-      ),
-      analysis: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
-        </svg>
-      ),
-      plays: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-        </svg>
-      ),
-      market: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      ),
-      alerts: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-        </svg>
-      )
-    };
+  const getMarketStatusStyle = () => {
+    const baseStyle = { ...styles.marketStatusBadge };
+    if (marketStatus === 'Market Open') {
+      return { ...baseStyle, backgroundColor: '#064E3B', color: '#10B981' };
+    } else if (marketStatus === 'Pre-Market' || marketStatus === 'After Hours') {
+      return { ...baseStyle, backgroundColor: '#7C2D12', color: '#F59E0B' };
+    }
+    return { ...baseStyle, backgroundColor: '#1F2937', color: '#9CA3AF' };
+  };
 
-    return (
-      <button
-        onClick={() => setActiveTab(name)}
-        className={`flex flex-col items-center justify-center py-2 px-3 ${
-          isActive ? 'text-blue-500' : 'text-gray-400'
-        }`}
-      >
-        {icons[name]}
-        <span className="text-xs mt-1">{label}</span>
-      </button>
-    );
+  const getMarketStatusDotStyle = () => {
+    const baseStyle = { ...styles.marketStatusDot };
+    if (marketStatus === 'Market Open') {
+      return { ...baseStyle, backgroundColor: '#10B981' };
+    } else if (marketStatus === 'Pre-Market' || marketStatus === 'After Hours') {
+      return { ...baseStyle, backgroundColor: '#F59E0B' };
+    }
+    return { ...baseStyle, backgroundColor: '#9CA3AF' };
   };
 
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col">
+    <div style={styles.app}>
       {/* Header */}
-      <div className="bg-gradient-to-b from-gray-900 to-black p-4 text-center">
-        <h1 className="text-3xl font-bold text-blue-400">Rolo AI</h1>
-        <p className="text-gray-400 text-sm">Professional Trading Assistant</p>
-        <div className="mt-2 text-xs">
-          <span className={`inline-flex items-center px-2 py-1 rounded-full ${
-            marketStatus === 'Market Open' ? 'bg-green-900 text-green-300' :
-            marketStatus === 'Pre-Market' || marketStatus === 'After Hours' ? 'bg-yellow-900 text-yellow-300' :
-            'bg-gray-800 text-gray-400'
-          }`}>
-            <span className="w-2 h-2 bg-current rounded-full mr-2 animate-pulse"></span>
+      <div style={styles.header}>
+        <h1 style={styles.title}>Rolo AI</h1>
+        <p style={styles.subtitle}>Professional Trading Assistant</p>
+        <div style={styles.marketStatus}>
+          <span style={getMarketStatusStyle()}>
+            <span style={getMarketStatusDotStyle()}></span>
             {marketStatus}
           </span>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-y-auto pb-20">
+      <div style={styles.content}>
         {activeTab === 'ticker' && (
-          <div className="p-4">
+          <div>
             {/* Search Bar */}
-            <div className="mb-6">
-              <div className="flex gap-2">
+            <div style={styles.searchContainer}>
+              <div style={styles.searchBar}>
                 <input
                   type="text"
                   value={searchTicker}
                   onChange={(e) => setSearchTicker(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
                   placeholder="Enter ticker symbol"
-                  className="flex-1 bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                  style={styles.searchInput}
                 />
                 <button
                   onClick={handleSearch}
-                  className="bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-xl font-semibold transition-colors"
+                  style={styles.searchButton}
+                  onMouseOver={(e) => e.target.style.backgroundColor = '#2563EB'}
+                  onMouseOut={(e) => e.target.style.backgroundColor = '#3B82F6'}
                 >
                   Search
                 </button>
               </div>
             </div>
 
-            {/* Popular Stocks Grid */}
-            <div className="mb-6">
-              <h2 className="text-lg font-semibold mb-3 flex items-center">
-                <span className="mr-2">📈</span> Popular Stocks
-              </h2>
-              <div className="grid grid-cols-3 gap-3">
-                {popularStocks.map(symbol => {
-                  const data = stockData[symbol];
-                  return (
-                    <button
-                      key={symbol}
-                      onClick={() => setSelectedStock(symbol)}
-                      className={`bg-gray-900 border ${
-                        selectedStock === symbol ? 'border-blue-500' : 'border-gray-700'
-                      } rounded-xl p-3 text-center hover:border-gray-600 transition-all`}
-                    >
-                      <div className="font-bold">{symbol}</div>
-                      {data && (
-                        <>
-                          <div className="text-sm text-gray-400">${data.price}</div>
-                          <div className={`text-xs ${
-                            parseFloat(data.change) >= 0 ? 'text-green-400' : 'text-red-400'
-                          }`}>
-                            {data.changePercent}
-                          </div>
-                        </>
-                      )}
-                    </button>
-                  );
-                })}
+            {/* Popular Stocks */}
+            <div style={{ padding: '0 20px' }}>
+              <div style={styles.stocksSection}>
+                <h2 style={styles.sectionTitle}>
+                  <span style={{ marginRight: '8px' }}>📈</span> Popular Stocks
+                </h2>
+                <div style={styles.stockGrid}>
+                  {popularStocks.map(symbol => {
+                    const data = stockData[symbol];
+                    return (
+                      <div
+                        key={symbol}
+                        onClick={() => setSelectedStock(symbol)}
+                        style={selectedStock === symbol ? styles.stockCardActive : styles.stockCard}
+                        onMouseOver={(e) => {
+                          if (selectedStock !== symbol) {
+                            e.currentTarget.style.borderColor = '#4B5563';
+                          }
+                        }}
+                        onMouseOut={(e) => {
+                          if (selectedStock !== symbol) {
+                            e.currentTarget.style.borderColor = '#374151';
+                          }
+                        }}
+                      >
+                        <div style={styles.stockSymbol}>{symbol}</div>
+                        {data && (
+                          <>
+                            <div style={styles.stockPrice}>${data.price}</div>
+                            <div style={{
+                              ...styles.stockChange,
+                              color: parseFloat(data.change) >= 0 ? '#10B981' : '#EF4444'
+                            }}>
+                              {data.changePercent}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
+
+              {/* Selected Stock Details */}
+              {selectedStock && stockData[selectedStock] && (
+                <div style={styles.stockDetails}>
+                  <div style={styles.stockDetailsHeader}>
+                    <div>
+                      <h2 style={styles.stockDetailsTitle}>{selectedStock}</h2>
+                      <p style={styles.stockDetailsStatus}>{marketStatus}</p>
+                    </div>
+                    <div style={styles.stockDetailsPrice}>
+                      <div style={styles.stockDetailsPriceValue}>
+                        ${stockData[selectedStock].price}
+                      </div>
+                      <div style={{
+                        ...styles.stockDetailsChange,
+                        color: parseFloat(stockData[selectedStock].change) >= 0 ? '#10B981' : '#EF4444'
+                      }}>
+                        {stockData[selectedStock].change} ({stockData[selectedStock].changePercent})
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={styles.metricsGrid}>
+                    <div style={styles.metricCard}>
+                      <p style={styles.metricLabel}>VOLUME</p>
+                      <p style={styles.metricValue}>{stockData[selectedStock].volume}</p>
+                    </div>
+                    <div style={styles.metricCard}>
+                      <p style={styles.metricLabel}>HIGH</p>
+                      <p style={styles.metricValue}>${stockData[selectedStock].high}</p>
+                    </div>
+                    <div style={styles.metricCard}>
+                      <p style={styles.metricLabel}>LOW</p>
+                      <p style={styles.metricValue}>${stockData[selectedStock].low}</p>
+                    </div>
+                    <div style={styles.metricCard}>
+                      <p style={styles.metricLabel}>OPEN</p>
+                      <p style={styles.metricValue}>${stockData[selectedStock].open}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
-
-            {/* Selected Stock Details */}
-            {selectedStock && stockData[selectedStock] && (
-              <div className="bg-gray-900 rounded-2xl p-6 border border-gray-800">
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h2 className="text-3xl font-bold">{selectedStock}</h2>
-                    <p className="text-gray-400 text-sm">{marketStatus}</p>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-3xl font-bold text-green-400">
-                      ${stockData[selectedStock].price}
-                    </div>
-                    <div className={`text-sm ${
-                      parseFloat(stockData[selectedStock].change) >= 0 ? 'text-green-400' : 'text-red-400'
-                    }`}>
-                      {stockData[selectedStock].change} ({stockData[selectedStock].changePercent})
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4 mt-6">
-                  <div className="bg-black rounded-xl p-4">
-                    <p className="text-gray-400 text-sm">VOLUME</p>
-                    <p className="text-xl font-semibold">{stockData[selectedStock].volume}</p>
-                  </div>
-                  <div className="bg-black rounded-xl p-4">
-                    <p className="text-gray-400 text-sm">HIGH</p>
-                    <p className="text-xl font-semibold">${stockData[selectedStock].high}</p>
-                  </div>
-                  <div className="bg-black rounded-xl p-4">
-                    <p className="text-gray-400 text-sm">LOW</p>
-                    <p className="text-xl font-semibold">${stockData[selectedStock].low}</p>
-                  </div>
-                  <div className="bg-black rounded-xl p-4">
-                    <p className="text-gray-400 text-sm">OPEN</p>
-                    <p className="text-xl font-semibold">${stockData[selectedStock].open}</p>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         )}
 
         {activeTab === 'analysis' && analysisData && (
-          <div className="p-4">
-            <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl p-6 mb-4">
-              <h2 className="text-2xl font-bold mb-2">{analysisData.symbol} Analysis</h2>
-              <p className="text-gray-400">Technical & Fundamental Overview</p>
+          <div style={{ padding: '20px' }}>
+            <div style={{
+              background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)',
+              borderRadius: '20px',
+              padding: '24px',
+              marginBottom: '16px'
+            }}>
+              <h2 style={{ fontSize: '24px', fontWeight: 'bold', margin: '0 0 8px 0' }}>
+                {analysisData.symbol} Analysis
+              </h2>
+              <p style={{ color: '#9CA3AF', margin: 0 }}>Technical & Fundamental Overview</p>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              <div className="bg-gray-900 rounded-xl p-4 text-center">
-                <p className="text-3xl font-bold text-green-400">{analysisData.technicalScore}</p>
-                <p className="text-gray-400 text-sm">Technical Score</p>
+            <div style={styles.metricsGrid}>
+              <div style={{ ...styles.metricCard, textAlign: 'center', padding: '24px' }}>
+                <p style={{ fontSize: '36px', fontWeight: 'bold', color: '#10B981', margin: '0' }}>
+                  {analysisData.technicalScore}
+                </p>
+                <p style={styles.metricLabel}>Technical Score</p>
               </div>
-              <div className="bg-gray-900 rounded-xl p-4 text-center">
-                <p className="text-3xl font-bold">{analysisData.rsi}</p>
-                <p className="text-gray-400 text-sm">RSI</p>
+              <div style={{ ...styles.metricCard, textAlign: 'center', padding: '24px' }}>
+                <p style={{ fontSize: '36px', fontWeight: 'bold', margin: '0' }}>
+                  {analysisData.rsi}
+                </p>
+                <p style={styles.metricLabel}>RSI</p>
               </div>
-              <div className="bg-gray-900 rounded-xl p-4 text-center">
-                <p className="text-2xl font-bold">${analysisData.support}</p>
-                <p className="text-gray-400 text-sm">Support</p>
+              <div style={{ ...styles.metricCard, textAlign: 'center', padding: '24px' }}>
+                <p style={{ fontSize: '24px', fontWeight: 'bold', margin: '0' }}>
+                  ${analysisData.support}
+                </p>
+                <p style={styles.metricLabel}>Support</p>
               </div>
-              <div className="bg-gray-900 rounded-xl p-4 text-center">
-                <p className="text-2xl font-bold">${analysisData.resistance}</p>
-                <p className="text-gray-400 text-sm">Resistance</p>
+              <div style={{ ...styles.metricCard, textAlign: 'center', padding: '24px' }}>
+                <p style={{ fontSize: '24px', fontWeight: 'bold', margin: '0' }}>
+                  ${analysisData.resistance}
+                </p>
+                <p style={styles.metricLabel}>Resistance</p>
               </div>
             </div>
 
-            <div className="space-y-4">
-              <div className="bg-gray-900 rounded-xl p-4">
-                <p className="text-gray-400 text-sm mb-1">Options Strategy</p>
-                <p className="text-lg font-semibold">{analysisData.strategy}</p>
+            <div style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={styles.stockDetails}>
+                <p style={styles.metricLabel}>Options Strategy</p>
+                <p style={{ fontSize: '18px', fontWeight: '600' }}>{analysisData.strategy}</p>
               </div>
-              <div className="bg-gray-900 rounded-xl p-4">
-                <p className="text-gray-400 text-sm mb-1">Risk Level</p>
-                <p className="text-lg font-semibold">{analysisData.riskLevel}</p>
+              <div style={styles.stockDetails}>
+                <p style={styles.metricLabel}>Risk Level</p>
+                <p style={{ fontSize: '18px', fontWeight: '600' }}>{analysisData.riskLevel}</p>
               </div>
-              <div className="bg-gray-900 rounded-xl p-4">
-                <p className="text-gray-400 text-sm mb-1">Recommendation</p>
-                <p className="text-lg font-semibold text-green-400">{analysisData.recommendation}</p>
+              <div style={styles.stockDetails}>
+                <p style={styles.metricLabel}>Recommendation</p>
+                <p style={{ fontSize: '18px', fontWeight: '600', color: '#10B981' }}>
+                  {analysisData.recommendation}
+                </p>
               </div>
             </div>
           </div>
         )}
 
         {activeTab === 'chat' && (
-          <div className="flex flex-col h-full p-4">
-            <div className="flex-1 overflow-y-auto mb-4 space-y-3">
+          <div style={styles.chatContainer}>
+            <div style={styles.chatWindow}>
               {chatMessages.map((msg, idx) => (
-                <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-xs px-4 py-3 rounded-2xl ${
-                    msg.role === 'user' 
-                      ? 'bg-blue-600 text-white' 
-                      : 'bg-gray-800 text-gray-200'
-                  }`}>
-                    {msg.content}
-                  </div>
+                <div
+                  key={idx}
+                  style={{
+                    ...styles.chatMessage,
+                    ...(msg.role === 'user' ? styles.chatMessageUser : styles.chatMessageAI)
+                  }}
+                >
+                  {msg.content}
                 </div>
               ))}
             </div>
-            <div className="flex gap-2">
+            <div style={styles.chatInputContainer}>
               <input
                 type="text"
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
                 placeholder="Ask Rolo anything..."
-                className="flex-1 bg-gray-900 border border-gray-700 rounded-full px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                style={styles.chatInput}
               />
               <button
                 onClick={handleSendMessage}
-                className="bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-full transition-colors"
+                style={styles.chatSendButton}
               >
                 Send
               </button>
@@ -361,61 +644,102 @@ const RoloApp = () => {
         )}
 
         {activeTab === 'plays' && (
-          <div className="p-4">
-            <h2 className="text-2xl font-bold mb-4">Smart Plays</h2>
-            <div className="space-y-4">
-              <div className="bg-gradient-to-r from-green-900 to-green-800 rounded-xl p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-lg font-semibold">🚀 Momentum Play</h3>
-                  <span className="bg-green-700 px-2 py-1 rounded text-xs">85% Confidence</span>
+          <div style={{ padding: '20px' }}>
+            <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px' }}>Smart Plays</h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{
+                background: 'linear-gradient(to right, #064E3B, #065F46)',
+                borderRadius: '12px',
+                padding: '16px'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <h3 style={{ fontSize: '18px', fontWeight: '600', margin: 0 }}>🚀 Momentum Play</h3>
+                  <span style={{
+                    backgroundColor: '#059669',
+                    padding: '4px 8px',
+                    borderRadius: '4px',
+                    fontSize: '12px'
+                  }}>85% Confidence</span>
                 </div>
-                <p className="text-sm text-gray-300">NVDA showing strong breakout pattern</p>
-                <p className="text-xs text-gray-400 mt-2">Entry: $890 | Target: $920 | Stop: $875</p>
+                <p style={{ fontSize: '14px', color: '#D1D5DB', margin: '0 0 8px 0' }}>
+                  NVDA showing strong breakout pattern
+                </p>
+                <p style={{ fontSize: '12px', color: '#9CA3AF', margin: 0 }}>
+                  Entry: $890 | Target: $920 | Stop: $875
+                </p>
               </div>
-              <div className="bg-gradient-to-r from-blue-900 to-blue-800 rounded-xl p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-lg font-semibold">💎 Value Pick</h3>
-                  <span className="bg-blue-700 px-2 py-1 rounded text-xs">72% Confidence</span>
+              <div style={{
+                background: 'linear-gradient(to right, #1E3A8A, #1E40AF)',
+                borderRadius: '12px',
+                padding: '16px'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <h3 style={{ fontSize: '18px', fontWeight: '600', margin: 0 }}>💎 Value Pick</h3>
+                  <span style={{
+                    backgroundColor: '#2563EB',
+                    padding: '4px 8px',
+                    borderRadius: '4px',
+                    fontSize: '12px'
+                  }}>72% Confidence</span>
                 </div>
-                <p className="text-sm text-gray-300">AAPL oversold on daily timeframe</p>
-                <p className="text-xs text-gray-400 mt-2">Entry: $209 | Target: $220 | Stop: $205</p>
+                <p style={{ fontSize: '14px', color: '#D1D5DB', margin: '0 0 8px 0' }}>
+                  AAPL oversold on daily timeframe
+                </p>
+                <p style={{ fontSize: '12px', color: '#9CA3AF', margin: 0 }}>
+                  Entry: $209 | Target: $220 | Stop: $205
+                </p>
               </div>
             </div>
           </div>
         )}
 
         {activeTab === 'market' && (
-          <div className="p-4">
-            <h2 className="text-2xl font-bold mb-4">Market Overview</h2>
-            <div className="space-y-3">
-              <div className="bg-gray-900 rounded-xl p-4 flex justify-between items-center">
+          <div style={{ padding: '20px' }}>
+            <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px' }}>Market Overview</h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{
+                ...styles.stockDetails,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
                 <div>
-                  <p className="font-semibold">S&P 500</p>
-                  <p className="text-sm text-gray-400">SPY</p>
+                  <p style={{ fontWeight: '600', margin: '0' }}>S&P 500</p>
+                  <p style={{ fontSize: '14px', color: '#9CA3AF', margin: '4px 0 0 0' }}>SPY</p>
                 </div>
-                <div className="text-right">
-                  <p className="text-lg font-bold">$502.34</p>
-                  <p className="text-sm text-green-400">+0.82%</p>
+                <div style={{ textAlign: 'right' }}>
+                  <p style={{ fontSize: '18px', fontWeight: 'bold', margin: '0' }}>$502.34</p>
+                  <p style={{ fontSize: '14px', color: '#10B981', margin: '4px 0 0 0' }}>+0.82%</p>
                 </div>
               </div>
-              <div className="bg-gray-900 rounded-xl p-4 flex justify-between items-center">
+              <div style={{
+                ...styles.stockDetails,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
                 <div>
-                  <p className="font-semibold">NASDAQ</p>
-                  <p className="text-sm text-gray-400">QQQ</p>
+                  <p style={{ fontWeight: '600', margin: '0' }}>NASDAQ</p>
+                  <p style={{ fontSize: '14px', color: '#9CA3AF', margin: '4px 0 0 0' }}>QQQ</p>
                 </div>
-                <div className="text-right">
-                  <p className="text-lg font-bold">$420.15</p>
-                  <p className="text-sm text-green-400">+1.24%</p>
+                <div style={{ textAlign: 'right' }}>
+                  <p style={{ fontSize: '18px', fontWeight: 'bold', margin: '0' }}>$420.15</p>
+                  <p style={{ fontSize: '14px', color: '#10B981', margin: '4px 0 0 0' }}>+1.24%</p>
                 </div>
               </div>
-              <div className="bg-gray-900 rounded-xl p-4 flex justify-between items-center">
+              <div style={{
+                ...styles.stockDetails,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
                 <div>
-                  <p className="font-semibold">VIX</p>
-                  <p className="text-sm text-gray-400">Volatility</p>
+                  <p style={{ fontWeight: '600', margin: '0' }}>VIX</p>
+                  <p style={{ fontSize: '14px', color: '#9CA3AF', margin: '4px 0 0 0' }}>Volatility</p>
                 </div>
-                <div className="text-right">
-                  <p className="text-lg font-bold">16.42</p>
-                  <p className="text-sm text-red-400">-2.15%</p>
+                <div style={{ textAlign: 'right' }}>
+                  <p style={{ fontSize: '18px', fontWeight: 'bold', margin: '0' }}>16.42</p>
+                  <p style={{ fontSize: '14px', color: '#EF4444', margin: '4px 0 0 0' }}>-2.15%</p>
                 </div>
               </div>
             </div>
@@ -423,26 +747,40 @@ const RoloApp = () => {
         )}
 
         {activeTab === 'alerts' && (
-          <div className="p-4">
-            <h2 className="text-2xl font-bold mb-4">Real-time Alerts</h2>
-            <div className="space-y-3">
-              <div className="bg-yellow-900 bg-opacity-30 border border-yellow-700 rounded-xl p-4">
-                <div className="flex items-start">
-                  <span className="text-2xl mr-3">⚡</span>
+          <div style={{ padding: '20px' }}>
+            <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px' }}>Real-time Alerts</h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{
+                backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                border: '1px solid #F59E0B',
+                borderRadius: '12px',
+                padding: '16px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start' }}>
+                  <span style={{ fontSize: '24px', marginRight: '12px' }}>⚡</span>
                   <div>
-                    <h3 className="font-semibold">Volume Spike Alert</h3>
-                    <p className="text-sm text-gray-300">TSLA showing 2x average volume</p>
-                    <p className="text-xs text-gray-500 mt-1">2 minutes ago</p>
+                    <h3 style={{ fontWeight: '600', margin: '0 0 4px 0' }}>Volume Spike Alert</h3>
+                    <p style={{ fontSize: '14px', color: '#D1D5DB', margin: '0 0 4px 0' }}>
+                      TSLA showing 2x average volume
+                    </p>
+                    <p style={{ fontSize: '12px', color: '#6B7280', margin: 0 }}>2 minutes ago</p>
                   </div>
                 </div>
               </div>
-              <div className="bg-green-900 bg-opacity-30 border border-green-700 rounded-xl p-4">
-                <div className="flex items-start">
-                  <span className="text-2xl mr-3">📈</span>
+              <div style={{
+                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                border: '1px solid #10B981',
+                borderRadius: '12px',
+                padding: '16px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start' }}>
+                  <span style={{ fontSize: '24px', marginRight: '12px' }}>📈</span>
                   <div>
-                    <h3 className="font-semibold">Breakout Alert</h3>
-                    <p className="text-sm text-gray-300">SPY breaking above resistance at $502</p>
-                    <p className="text-xs text-gray-500 mt-1">15 minutes ago</p>
+                    <h3 style={{ fontWeight: '600', margin: '0 0 4px 0' }}>Breakout Alert</h3>
+                    <p style={{ fontSize: '14px', color: '#D1D5DB', margin: '0 0 4px 0' }}>
+                      SPY breaking above resistance at $502
+                    </p>
+                    <p style={{ fontSize: '12px', color: '#6B7280', margin: 0 }}>15 minutes ago</p>
                   </div>
                 </div>
               </div>
@@ -452,14 +790,62 @@ const RoloApp = () => {
       </div>
 
       {/* Bottom Navigation */}
-      <div className="fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-800">
-        <div className="flex justify-around items-center">
-          <TabIcon name="chat" label="CHAT" isActive={activeTab === 'chat'} />
-          <TabIcon name="ticker" label="TICKER" isActive={activeTab === 'ticker'} />
-          <TabIcon name="analysis" label="ANALYSIS" isActive={activeTab === 'analysis'} />
-          <TabIcon name="plays" label="PLAYS" isActive={activeTab === 'plays'} />
-          <TabIcon name="market" label="MARKET" isActive={activeTab === 'market'} />
-          <TabIcon name="alerts" label="ALERTS" isActive={activeTab === 'alerts'} />
+      <div style={styles.bottomNav}>
+        <div style={styles.navContainer}>
+          <button
+            onClick={() => setActiveTab('chat')}
+            style={activeTab === 'chat' ? styles.navButtonActive : styles.navButton}
+          >
+            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
+            <span style={styles.navLabel}>CHAT</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('ticker')}
+            style={activeTab === 'ticker' ? styles.navButtonActive : styles.navButton}
+          >
+            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            <span style={styles.navLabel}>TICKER</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('analysis')}
+            style={activeTab === 'analysis' ? styles.navButtonActive : styles.navButton}
+          >
+            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+            </svg>
+            <span style={styles.navLabel}>ANALYSIS</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('plays')}
+            style={activeTab === 'plays' ? styles.navButtonActive : styles.navButton}
+          >
+            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            <span style={styles.navLabel}>PLAYS</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('market')}
+            style={activeTab === 'market' ? styles.navButtonActive : styles.navButton}
+          >
+            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span style={styles.navLabel}>MARKET</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('alerts')}
+            style={activeTab === 'alerts' ? styles.navButtonActive : styles.navButton}
+          >
+            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+            </svg>
+            <span style={styles.navLabel}>ALERTS</span>
+          </button>
         </div>
       </div>
     </div>
