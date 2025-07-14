@@ -1,26 +1,4 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
-import { initializeApp } from 'firebase/app';
-import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, query, where, addDoc, getDocs, deleteDoc } from 'firebase/firestore';
-
-// Ensure these global variables are defined by the Canvas environment
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
-// Initialize Firebase (only once)
-let firebaseApp;
-let db;
-let auth;
-
-try {
-  firebaseApp = initializeApp(firebaseConfig);
-  db = getFirestore(firebaseApp);
-  auth = getAuth(firebaseApp);
-} catch (error) {
-  console.error("Firebase initialization error:", error);
-  // Handle cases where Firebase might already be initialized or config is missing
-}
 
 // Helper function to format currency
 const formatCurrency = (value) => {
@@ -147,11 +125,7 @@ const mockChatResponse = (input) => {
 
 // Main App Component
 const App = () => {
-  // State for Firebase and user authentication
-  const [userId, setUserId] = useState(null);
-  const [isAuthReady, setIsAuthReady] = useState(false);
-
-  // UI State
+  // State for UI
   const [currentTab, setCurrentTab] = useState('watchlist');
   const [marketStatus, setMarketStatus] = useState('Loading...');
   const [marketStatusColor, setMarketStatusColor] = useState('text-gray-500');
@@ -185,76 +159,18 @@ const App = () => {
   const [isChatLoading, setIsChatLoading] = useState(false);
   const chatMessagesEndRef = useRef(null);
 
-  // --- Firebase Authentication and Firestore Setup ---
-  useEffect(() => {
-    if (!auth) {
-      console.error("Firebase Auth not initialized.");
-      return;
-    }
-
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        setUserId(user.uid);
-      } else {
-        // Sign in anonymously if no token is provided or user is not authenticated
-        try {
-          if (initialAuthToken) {
-            await signInWithCustomToken(auth, initialAuthToken);
-          } else {
-            await signInAnonymously(auth);
-          }
-          setUserId(auth.currentUser?.uid || crypto.randomUUID()); // Fallback if anonymous sign-in fails to get UID
-        } catch (error) {
-          console.error("Firebase anonymous sign-in failed:", error);
-          setUserId(crypto.randomUUID()); // Generate a random ID if all else fails
-        }
-      }
-      setIsAuthReady(true); // Auth state is ready
-    });
-
-    return () => unsubscribe();
-  }, []);
-
-  // --- Firestore Watchlist Persistence (Basic In-Memory for now, can be extended to Firestore) ---
-  // For now, watchlist is managed in component state.
-  // To persist, you'd add Firestore calls here:
-  // useEffect(() => {
-  //   if (isAuthReady && userId) {
-  //     const userWatchlistRef = doc(db, `artifacts/${appId}/users/${userId}/watchlist`, 'user_watchlist');
-  //     const unsubscribe = onSnapshot(userWatchlistRef, (docSnap) => {
-  //       if (docSnap.exists()) {
-  //         setPopularStocks(docSnap.data().symbols || []);
-  //       }
-  //     }, (error) => console.error("Error fetching watchlist:", error));
-  //     return () => unsubscribe();
-  //   }
-  // }, [isAuthReady, userId]);
-
-  // const updateWatchlistInFirestore = useCallback(async (newWatchlist) => {
-  //   if (isAuthReady && userId) {
-  //     const userWatchlistRef = doc(db, `artifacts/${appId}/users/${userId}/watchlist`, 'user_watchlist');
-  //     try {
-  //       await setDoc(userWatchlistRef, { symbols: newWatchlist }, { merge: true });
-  //     } catch (error) {
-  //       console.error("Error updating watchlist in Firestore:", error);
-  //     }
-  //   }
-  // }, [isAuthReady, userId]);
-
   const handleAddStock = () => {
     const symbol = newStockSymbol.trim().toUpperCase();
     if (symbol && !popularStocks.includes(symbol)) {
       const updatedStocks = [...popularStocks, symbol];
       setPopularStocks(updatedStocks);
       setNewStockSymbol('');
-      // updateWatchlistInFirestore(updatedStocks); // Uncomment for Firestore persistence
     }
   };
 
   const handleRemoveStock = (symbolToRemove) => {
     const updatedStocks = popularStocks.filter(symbol => symbol !== symbolToRemove);
     setPopularStocks(updatedStocks);
-    // updateWatchlistInFirestore(updatedStocks); // Uncomment for Firestore persistence
   };
 
   // --- Market Status Calculation ---
@@ -1009,12 +925,7 @@ const App = () => {
           <span className={`text-sm font-semibold ${marketStatusColor} animate-pulse`}>
             {marketStatus}
           </span>
-          {/* User ID display - MANDATORY for multi-user apps */}
-          {userId && (
-            <span className="text-xs text-gray-400 bg-gray-700 px-2 py-1 rounded-full">
-              User: {userId.substring(0, 8)}...
-            </span>
-          )}
+          {/* Removed User ID display as Firebase is not used */}
         </div>
       </header>
 
