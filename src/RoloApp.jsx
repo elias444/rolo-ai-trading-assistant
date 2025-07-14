@@ -19,16 +19,8 @@ const RoloApp = () => {
   ]);
   const [chatInput, setChatInput] = useState('');
   const smartPlaysIntervalRef = useRef(null);
-  const autoRefreshIntervalRef = useRef(null);
-  
-  // Editable popular stocks with local storage persistence
-  const [popularStocks, setPopularStocks] = useState(() => {
-    const saved = localStorage.getItem('popularStocks');
-    return saved ? JSON.parse(saved) : ['AAPL', 'TSLA', 'NVDA', 'SPY', 'QQQ', 'META', 'AMD', 'GOOGL', 'MSFT'];
-  });
-  const [isEditingStocks, setIsEditingStocks] = useState(false);
-  const [editingSymbol, setEditingSymbol] = useState('');
-  const [editingIndex, setEditingIndex] = useState(null);
+
+  const popularStocks = ['AAPL', 'TSLA', 'NVDA', 'SPY', 'QQQ', 'META', 'AMD', 'GOOGL', 'MSFT'];
 
   // Styles
   const styles = {
@@ -334,129 +326,6 @@ const RoloApp = () => {
     },
   };
 
-  // Check market status with more detailed sessions
-  useEffect(() => {
-    const checkMarketStatus = () => {
-      const now = new Date();
-      const easternTime = new Date(now.toLocaleString("en-US", {timeZone: "America/New_York"}));
-      const hours = easternTime.getHours();
-      const minutes = easternTime.getMinutes();
-      const day = easternTime.getDay();
-      const time = hours + (minutes / 60);
-      
-      // Check if it's a weekday
-      if (day >= 1 && day <= 5) {
-        if (time >= 4 && time < 9.5) {
-          setMarketStatus('Pre-Market');
-        } else if (time >= 9.5 && time < 16) {
-          setMarketStatus('Market Open');
-        } else if (time >= 16 && time < 20) {
-          setMarketStatus('After Hours');
-        } else if (time >= 20 || time < 4) {
-          setMarketStatus('Futures Open');
-        }
-      } else {
-        // Weekend - but check for Sunday futures
-        if (day === 0 && hours >= 18) {
-          setMarketStatus('Futures Open');
-        } else if (day === 5 && hours >= 16) {
-          setMarketStatus('After Hours');
-        } else {
-          setMarketStatus('Weekend');
-        }
-      }
-    };
-    
-    checkMarketStatus();
-    const interval = setInterval(checkMarketStatus, 30000); // Check every 30 seconds
-    return () => clearInterval(interval);
-  }, []);
-
-  // Save popular stocks to localStorage when changed
-  useEffect(() => {
-    localStorage.setItem('popularStocks', JSON.stringify(popularStocks));
-  }, [popularStocks]);
-
-  // Auto-refresh stock data based on market session
-  useEffect(() => {
-    const refreshInterval = marketStatus === 'Market Open' ? 60000 : // 1 minute during market hours
-                          marketStatus === 'Pre-Market' || marketStatus === 'After Hours' ? 120000 : // 2 minutes
-                          300000; // 5 minutes otherwise
-    
-    // Clear existing interval
-    if (autoRefreshIntervalRef.current) {
-      clearInterval(autoRefreshIntervalRef.current);
-    }
-    
-    // Set up new interval
-    autoRefreshIntervalRef.current = setInterval(() => {
-      // Refresh all popular stocks
-      popularStocks.forEach(symbol => {
-        fetchStockData(symbol);
-      });
-      // Refresh selected stock
-      if (selectedStock) {
-        fetchStockData(selectedStock);
-      }
-    }, refreshInterval);
-    
-    return () => {
-      if (autoRefreshIntervalRef.current) {
-        clearInterval(autoRefreshIntervalRef.current);
-      }
-    };
-  }, [marketStatus, popularStocks, selectedStock]);
-
-  // Fetch stock data
-  const fetchStockData = async (symbol) => {
-    setIsLoading(true);
-    try {
-      const response = await fetch(`/.netlify/functions/enhanced-stock-data?symbol=${symbol}`);
-      const data = await response.json();
-      if (response.ok) {
-        setStockData(prev => ({ ...prev, [symbol]: data }));
-      }
-    } catch (error) {
-      console.error('Error fetching stock data:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleEditStock = (index) => {
-    setEditingIndex(index);
-    setEditingSymbol(popularStocks[index]);
-    setIsEditingStocks(true);
-  };
-
-  const handleSaveStock = () => {
-    if (editingSymbol && editingIndex !== null) {
-      const newStocks = [...popularStocks];
-      newStocks[editingIndex] = editingSymbol.toUpperCase();
-      setPopularStocks(newStocks);
-      // Fetch data for the new stock
-      fetchStockData(editingSymbol.toUpperCase());
-    }
-    setIsEditingStocks(false);
-    setEditingIndex(null);
-    setEditingSymbol('');
-  };
-
-  const handleAddStock = () => {
-    if (popularStocks.length < 12) { // Limit to 12 stocks
-      const newStocks = [...popularStocks, 'NEW'];
-      setPopularStocks(newStocks);
-      handleEditStock(newStocks.length - 1);
-    }
-  };
-
-  const handleRemoveStock = (index) => {
-    if (popularStocks.length > 3) { // Keep at least 3 stocks
-      const newStocks = popularStocks.filter((_, i) => i !== index);
-      setPopularStocks(newStocks);
-    }
-  };
-
   // Add keyframes for animations
   useEffect(() => {
     const style = document.createElement('style');
@@ -477,7 +346,52 @@ const RoloApp = () => {
     return () => document.head.removeChild(style);
   }, []);
 
-  // Fetch AI Analysis
+  // Check market status - Fixed to show Pre-Market correctly
+  useEffect(() => {
+    const checkMarketStatus = () => {
+      const now = new Date();
+      const estTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+      const hour = estTime.getHours();
+      const minute = estTime.getMinutes();
+      const day = estTime.getDay();
+      if (day === 0 || day === 6) {
+        setMarketStatus('Weekend');
+      } else if (hour >= 4 && (hour < 9 || (hour === 9 && minute < 30))) {
+        setMarketStatus('Pre-Market');
+      } else if (hour >= 9 && hour < 16) {
+        setMarketStatus('Market Open');
+      } else if (hour >= 16 && hour < 20) {
+        setMarketStatus('After Hours');
+      } else {
+        setMarketStatus('Market Closed');
+      }
+    };
+    
+    checkMarketStatus();
+    const interval = setInterval(checkMarketStatus, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Fetch stock data - Fixed path for Netlify/iPhone
+  const fetchStockData = async (symbol) => {
+    setIsLoading(true);
+    try {
+      const response = await fetch(`/.netlify/functions/enhanced-stock-data?symbol=${symbol}`);
+      const data = await response.json();
+      if (response.ok) {
+        setStockData(prev => ({ ...prev, [symbol]: data }));
+      } else {
+        setStockData(prev => ({ ...prev, [symbol]: { price: 'N/A', change: 'N/A', changePercent: 'N/A', volume: 'N/A', high: 'N/A', low: 'N/A', open: 'N/A' } }));
+      }
+    } catch (error) {
+      console.error('Error fetching stock data:', error);
+      setStockData(prev => ({ ...prev, [symbol]: { price: 'N/A', change: 'N/A', changePercent: 'N/A', volume: 'N/A', high: 'N/A', low: 'N/A', open: 'N/A' } }));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Fetch AI Analysis - Fixed path
   const fetchAIAnalysis = async (symbol) => {
     setIsLoading(true);
     try {
@@ -497,7 +411,7 @@ const RoloApp = () => {
     }
   };
 
-  // Fetch Smart Plays
+  // Fetch Smart Plays - Fixed path
   const fetchSmartPlays = async () => {
     try {
       const response = await fetch('/.netlify/functions/ai-analysis', {
@@ -514,7 +428,7 @@ const RoloApp = () => {
     }
   };
 
-  // Fetch News Data
+  // Fetch News Data - Fixed path
   const fetchNewsData = async (symbol = null) => {
     try {
       const url = `/.netlify/functions/news-data${symbol ? `?symbol=${symbol}` : ''}`;
@@ -528,7 +442,7 @@ const RoloApp = () => {
     }
   };
 
-  // Fetch Technical Indicators
+  // Fetch Technical Indicators - Fixed path
   const fetchTechnicalIndicators = async (symbol) => {
     try {
       const response = await fetch(`/.netlify/functions/technical-indicators?symbol=${symbol}`);
@@ -541,7 +455,7 @@ const RoloApp = () => {
     }
   };
 
-  // Fetch Market Dashboard
+  // Fetch Market Dashboard - Fixed path
   const fetchMarketDashboard = async () => {
     try {
       const response = await fetch('/.netlify/functions/market-dashboard');
@@ -554,7 +468,7 @@ const RoloApp = () => {
     }
   };
 
-  // Fetch Economic Indicators
+  // Fetch Economic Indicators - Fixed path
   const fetchEconomicIndicators = async () => {
     try {
       const response = await fetch('/.netlify/functions/economic-indicators');
@@ -567,7 +481,7 @@ const RoloApp = () => {
     }
   };
 
-  // Fetch Real-time Alerts
+  // Fetch Real-time Alerts - Fixed path
   const fetchAlerts = async () => {
     try {
       const response = await fetch('/.netlify/functions/realtime-alerts');
@@ -582,19 +496,15 @@ const RoloApp = () => {
 
   // Setup smart plays interval during market hours
   useEffect(() => {
-    if (marketStatus === 'Market Open' || marketStatus === 'Pre-Market' || marketStatus === 'After Hours') {
+    if (marketStatus === 'Market Open') {
       // Fetch immediately
       fetchSmartPlays();
       
-      // Then fetch every hour during market hours, every 2 hours otherwise
-      const interval = marketStatus === 'Market Open' ? 3600000 : 7200000;
+      // Then fetch every hour
       smartPlaysIntervalRef.current = setInterval(() => {
         fetchSmartPlays();
-      }, interval);
+      }, 3600000); // 1 hour
     } else {
-      // Fetch once for closed market
-      fetchSmartPlays();
-      
       // Clear interval when market is closed
       if (smartPlaysIntervalRef.current) {
         clearInterval(smartPlaysIntervalRef.current);
@@ -613,7 +523,6 @@ const RoloApp = () => {
     if (selectedStock) {
       fetchStockData(selectedStock);
       if (activeTab === 'analysis') {
-        // Always fetch fresh analysis data when tab is selected
         fetchAIAnalysis(selectedStock);
         fetchTechnicalIndicators(selectedStock);
         fetchNewsData(selectedStock);
@@ -633,12 +542,6 @@ const RoloApp = () => {
     if (activeTab === 'market') {
       fetchMarketDashboard();
       fetchEconomicIndicators();
-      // Add refresh interval for market data
-      const marketInterval = setInterval(() => {
-        fetchMarketDashboard();
-        fetchEconomicIndicators();
-      }, 120000); // Refresh every 2 minutes
-      return () => clearInterval(marketInterval);
     } else if (activeTab === 'alerts') {
       fetchAlerts();
       // Refresh alerts every 30 seconds
@@ -646,14 +549,8 @@ const RoloApp = () => {
       return () => clearInterval(interval);
     } else if (activeTab === 'plays') {
       fetchSmartPlays();
-    } else if (activeTab === 'analysis' && selectedStock) {
-      // Ensure analysis data is loaded
-      if (!analysisData || analysisData.symbol !== selectedStock) {
-        fetchAIAnalysis(selectedStock);
-        fetchTechnicalIndicators(selectedStock);
-      }
     }
-  }, [activeTab, selectedStock]);
+  }, [activeTab]);
 
   const handleSearch = () => {
     if (searchTicker) {
@@ -697,7 +594,7 @@ const RoloApp = () => {
     const baseStyle = { ...styles.marketStatusBadge };
     if (marketStatus === 'Market Open') {
       return { ...baseStyle, backgroundColor: '#064E3B', color: '#10B981' };
-    } else if (marketStatus === 'Pre-Market' || marketStatus === 'After Hours' || marketStatus === 'Futures Open') {
+    } else if (marketStatus === 'Pre-Market' || marketStatus === 'After Hours') {
       return { ...baseStyle, backgroundColor: '#7C2D12', color: '#F59E0B' };
     }
     return { ...baseStyle, backgroundColor: '#1F2937', color: '#9CA3AF' };
@@ -707,7 +604,7 @@ const RoloApp = () => {
     const baseStyle = { ...styles.marketStatusDot };
     if (marketStatus === 'Market Open') {
       return { ...baseStyle, backgroundColor: '#10B981' };
-    } else if (marketStatus === 'Pre-Market' || marketStatus === 'After Hours' || marketStatus === 'Futures Open') {
+    } else if (marketStatus === 'Pre-Market' || marketStatus === 'After Hours') {
       return { ...baseStyle, backgroundColor: '#F59E0B' };
     }
     return { ...baseStyle, backgroundColor: '#9CA3AF' };
@@ -726,8 +623,10 @@ const RoloApp = () => {
     <div style={styles.app}>
       {/* Header */}
       <div style={styles.header}>
-        <h1 style={styles.title}>Rolo AI</h1>
-        <p style={styles.subtitle}>Professional Trading Assistant</p>
+        <h1 style={styles.title}>Rolo</h1>
+        <p style={styles.subtitle}>
+          AI Trading Assistant
+        </p>
         <div style={styles.marketStatus}>
           <span style={getMarketStatusStyle()}>
             <span style={getMarketStatusDotStyle()}></span>
@@ -766,98 +665,29 @@ const RoloApp = () => {
             <div style={{ padding: '0 20px' }}>
               <div style={styles.stocksSection}>
                 <h2 style={styles.sectionTitle}>
-                  <span style={{ marginRight: '8px' }}>📈</span> Popular Stocks
-                  <button
-                    onClick={() => setIsEditingStocks(!isEditingStocks)}
-                    style={{
-                      marginLeft: 'auto',
-                      backgroundColor: 'transparent',
-                      border: '1px solid #3B82F6',
-                      color: '#3B82F6',
-                      borderRadius: '8px',
-                      padding: '4px 12px',
-                      fontSize: '14px',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    {isEditingStocks ? 'Done' : 'Edit'}
-                  </button>
+                  <span style={ { marginRight: '8px' } }>📈</span> Popular Stocks
                 </h2>
                 <div style={styles.stockGrid}>
-                  {popularStocks.map((symbol, index) => {
+                  {popularStocks.map(symbol => {
                     const data = stockData[symbol];
-                    const isEditing = isEditingStocks && editingIndex === index;
-                    
                     return (
                       <div
-                        key={index}
-                        onClick={() => !isEditingStocks && setSelectedStock(symbol)}
-                        style={{
-                          ...((selectedStock === symbol && !isEditingStocks) ? styles.stockCardActive : styles.stockCard),
-                          position: 'relative'
-                        }}
+                        key={symbol}
+                        onClick={() => setSelectedStock(symbol)}
+                        style={selectedStock === symbol ? styles.stockCardActive : styles.stockCard}
                         onMouseOver={(e) => {
-                          if (selectedStock !== symbol && !isEditingStocks) {
+                          if (selectedStock !== symbol) {
                             e.currentTarget.style.borderColor = '#4B5563';
                           }
                         }}
                         onMouseOut={(e) => {
-                          if (selectedStock !== symbol && !isEditingStocks) {
+                          if (selectedStock !== symbol) {
                             e.currentTarget.style.borderColor = '#374151';
                           }
                         }}
                       >
-                        {isEditingStocks && (
-                          <button
-                            onClick={() => handleRemoveStock(index)}
-                            style={{
-                              position: 'absolute',
-                              top: '-8px',
-                              right: '-8px',
-                              backgroundColor: '#EF4444',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '50%',
-                              width: '20px',
-                              height: '20px',
-                              cursor: 'pointer',
-                              fontSize: '12px',
-                              lineHeight: '1'
-                            }}
-                          >
-                            ×
-                          </button>
-                        )}
-                        
-                        {isEditing ? (
-                          <input
-                            type="text"
-                            value={editingSymbol}
-                            onChange={(e) => setEditingSymbol(e.target.value.toUpperCase())}
-                            onBlur={handleSaveStock}
-                            onKeyPress={(e) => e.key === 'Enter' && handleSaveStock()}
-                            style={{
-                              backgroundColor: 'transparent',
-                              border: 'none',
-                              color: 'white',
-                              textAlign: 'center',
-                              fontSize: '14px',
-                              fontWeight: 'bold',
-                              width: '100%',
-                              outline: 'none'
-                            }}
-                            autoFocus
-                          />
-                        ) : (
-                          <div 
-                            onClick={() => isEditingStocks && handleEditStock(index)}
-                            style={{ cursor: isEditingStocks ? 'pointer' : 'default' }}
-                          >
-                            <div style={styles.stockSymbol}>{symbol}</div>
-                          </div>
-                        )}
-                        
-                        {data && !isEditing && (
+                        <div style={styles.stockSymbol}>{symbol}</div>
+                        {data && (
                           <>
                             <div style={styles.stockPrice}>${data.price}</div>
                             <div style={{
@@ -866,38 +696,11 @@ const RoloApp = () => {
                             }}>
                               {data.changePercent}
                             </div>
-                            <div style={{
-                              fontSize: '10px',
-                              color: '#6B7280',
-                              marginTop: '4px'
-                            }}>
-                              {data.sessionLabel}
-                            </div>
                           </>
                         )}
                       </div>
                     );
                   })}
-                  
-                  {isEditingStocks && popularStocks.length < 12 && (
-                    <div
-                      onClick={handleAddStock}
-                      style={{
-                        ...styles.stockCard,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        borderStyle: 'dashed'
-                      }}
-                    >
-                      <span style={{ fontSize: '24px' }}>+</span>
-                    </div>
-                  )}
-                </div>
-                
-                <div style={{ marginTop: '12px', fontSize: '12px', color: '#6B7280', textAlign: 'center' }}>
-                  Prices update every {marketStatus === 'Market Open' ? '1-2' : '2-5'} minutes
                 </div>
               </div>
 
@@ -907,7 +710,7 @@ const RoloApp = () => {
                   <div style={styles.stockDetailsHeader}>
                     <div>
                       <h2 style={styles.stockDetailsTitle}>{selectedStock}</h2>
-                      <p style={styles.stockDetailsStatus}>{stockData[selectedStock].sessionLabel || marketStatus}</p>
+                      <p style={styles.stockDetailsStatus}>{marketStatus}</p>
                     </div>
                     <div style={styles.stockDetailsPrice}>
                       <div style={styles.stockDetailsPriceValue}>
@@ -940,10 +743,6 @@ const RoloApp = () => {
                       <p style={styles.metricValue}>${stockData[selectedStock].open}</p>
                     </div>
                   </div>
-                  
-                  <div style={{ marginTop: '12px', fontSize: '12px', color: '#6B7280', textAlign: 'center' }}>
-                    Last updated: {new Date(stockData[selectedStock].dataTimestamp || Date.now()).toLocaleTimeString()}
-                  </div>
                 </div>
               )}
             </div>
@@ -967,32 +766,6 @@ const RoloApp = () => {
             {isLoading && (
               <div style={styles.loadingSpinner}>
                 <p>🔄 Analyzing {selectedStock} with AI...</p>
-              </div>
-            )}
-
-            {!isLoading && (!analysisData || analysisData.symbol !== selectedStock) && (
-              <div style={{ textAlign: 'center', padding: '40px 20px' }}>
-                <p style={{ color: '#9CA3AF', marginBottom: '20px' }}>
-                  Click below to generate AI-powered analysis
-                </p>
-                <button
-                  onClick={() => {
-                    fetchAIAnalysis(selectedStock);
-                    fetchTechnicalIndicators(selectedStock);
-                  }}
-                  style={{
-                    backgroundColor: '#3B82F6',
-                    color: '#ffffff',
-                    border: 'none',
-                    borderRadius: '12px',
-                    padding: '12px 24px',
-                    fontSize: '16px',
-                    fontWeight: '600',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Generate Analysis
-                </button>
               </div>
             )}
 
@@ -1133,23 +906,13 @@ const RoloApp = () => {
             {technicalData && (
               <div style={styles.analysisCard}>
                 <h3 style={{ margin: '0 0 12px 0', color: '#3B82F6' }}>Technical Indicators</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {technicalData.indicators && Object.entries(technicalData.indicators).map(([key, value]) => (
-                    <div key={key} style={{ borderBottom: '1px solid #374151', paddingBottom: '8px' }}>
-                      <p style={{ ...styles.metricLabel, margin: '0 0 4px 0' }}>{key.toUpperCase()}</p>
-                      <div style={{ fontSize: '14px', color: '#ffffff', wordBreak: 'break-word' }}>
-                        {typeof value === 'object' ? (
-                          <div style={{ fontSize: '12px' }}>
-                            {Object.entries(value).map(([k, v]) => (
-                              <div key={k} style={{ marginBottom: '2px' }}>
-                                <span style={{ color: '#9CA3AF' }}>{k}:</span> {v}
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <span style={{ fontWeight: 'bold' }}>{value}</span>
-                        )}
-                      </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
+                  {Object.entries(technicalData.indicators).map(([key, value]) => (
+                    <div key={key}>
+                      <p style={styles.metricLabel}>{key.toUpperCase()}</p>
+                      <p style={{ margin: '0', fontWeight: 'bold' }}>
+                        {typeof value === 'object' ? JSON.stringify(value.value || value) : value}
+                      </p>
                     </div>
                   ))}
                 </div>
@@ -1197,19 +960,12 @@ const RoloApp = () => {
           <div style={{ padding: '20px' }}>
             <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '8px' }}>Smart Plays</h2>
             <p style={{ color: '#9CA3AF', marginBottom: '16px', fontSize: '14px' }}>
-              AI-generated trading opportunities • Updated {marketStatus === 'Market Open' ? 'hourly' : marketStatus.includes('Market') ? 'every 2 hours' : 'at market open'}
+              AI-generated trading opportunities • Updated {marketStatus === 'Market Open' ? 'hourly' : 'at market open'}
             </p>
-            
-            <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: '#1a1a1a', borderRadius: '12px' }}>
-              <p style={{ fontSize: '12px', color: '#6B7280', margin: 0 }}>
-                🤖 AI analyzes: Real-time prices • News sentiment • Technical indicators • Market momentum • Volume patterns
-              </p>
-            </div>
             
             {smartPlays.length === 0 && (
               <div style={styles.loadingSpinner}>
-                <p>🤖 Analyzing markets with AI to find opportunities...</p>
-                <p style={{ fontSize: '12px', color: '#6B7280', marginTop: '8px' }}>This may take a moment</p>
+                <p>🤖 Generating smart plays...</p>
               </div>
             )}
 
@@ -1274,7 +1030,7 @@ const RoloApp = () => {
                   </p>
                 )}
                 
-                <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ marginTop: '8px' }}>
                   <span style={{
                     fontSize: '12px',
                     padding: '2px 8px',
@@ -1287,36 +1043,15 @@ const RoloApp = () => {
                   }}>
                     {play.riskLevel?.toUpperCase()} RISK
                   </span>
-                  <span style={{ fontSize: '10px', color: '#6B7280' }}>
-                    Generated: {new Date().toLocaleTimeString()}
-                  </span>
                 </div>
               </div>
             ))}
-            
-            {smartPlays.length > 0 && (
-              <div style={{ marginTop: '16px', fontSize: '12px', color: '#6B7280', textAlign: 'center' }}>
-                Based on real-time market data • Not financial advice
-              </div>
-            )}
           </div>
         )}
 
         {activeTab === 'market' && (
           <div style={{ padding: '20px' }}>
             <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px' }}>Market Overview</h2>
-            
-            {/* Market Status Badge */}
-            <div style={{ marginBottom: '16px', textAlign: 'center' }}>
-              <span style={{
-                ...getMarketStatusStyle(),
-                fontSize: '14px',
-                padding: '8px 16px'
-              }}>
-                <span style={getMarketStatusDotStyle()}></span>
-                {marketStatus}
-              </span>
-            </div>
             
             {/* Major Indices */}
             <div style={{ marginBottom: '24px' }}>
@@ -1331,9 +1066,6 @@ const RoloApp = () => {
                   }}>
                     <div>
                       <p style={{ fontWeight: '600', margin: '0' }}>{marketData.sp500.symbol}</p>
-                      <p style={{ fontSize: '12px', color: '#6B7280', margin: '2px 0 0 0' }}>
-                        {marketStatus.includes('Futures') ? 'Futures' : 'Live'}
-                      </p>
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <p style={{ fontSize: '18px', fontWeight: 'bold', margin: '0' }}>${marketData.sp500.price}</p>
@@ -1357,9 +1089,6 @@ const RoloApp = () => {
                   }}>
                     <div>
                       <p style={{ fontWeight: '600', margin: '0' }}>{marketData.nasdaq.symbol}</p>
-                      <p style={{ fontSize: '12px', color: '#6B7280', margin: '2px 0 0 0' }}>
-                        {marketStatus.includes('Futures') ? 'Futures' : 'Live'}
-                      </p>
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <p style={{ fontSize: '18px', fontWeight: 'bold', margin: '0' }}>${marketData.nasdaq.price}</p>
@@ -1383,9 +1112,6 @@ const RoloApp = () => {
                   }}>
                     <div>
                       <p style={{ fontWeight: '600', margin: '0' }}>{marketData.dowJones.symbol}</p>
-                      <p style={{ fontSize: '12px', color: '#6B7280', margin: '2px 0 0 0' }}>
-                        {marketStatus.includes('Futures') ? 'Futures' : 'Live'}
-                      </p>
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <p style={{ fontSize: '18px', fontWeight: 'bold', margin: '0' }}>${marketData.dowJones.price}</p>
@@ -1405,97 +1131,37 @@ const RoloApp = () => {
             {/* Economic Indicators */}
             {economicData && (
               <div style={{ marginBottom: '24px' }}>
-                <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '12px' }}>Key Economic Indicators</h3>
+                <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '12px' }}>Economic Indicators</h3>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
-                  {economicData.indicators?.treasury10Year && (
-                    <div style={styles.metricCard}>
-                      <p style={styles.metricLabel}>10-Year Treasury</p>
+                  {economicData.indicators && Object.entries(economicData.indicators).map(([key, value]) => (
+                    <div key={key} style={styles.metricCard}>
+                      <p style={styles.metricLabel}>{key.replace(/([A-Z])/g, ' $1').trim()}</p>
                       <p style={styles.metricValue}>
-                        {economicData.indicators.treasury10Year.value}%
+                        {value.value}{value.unit === '%' ? '%' : ''} 
                       </p>
                       <p style={{ fontSize: '10px', color: '#6B7280', margin: '4px 0 0 0' }}>
-                        {economicData.indicators.treasury10Year.date}
+                        {value.date}
                       </p>
                     </div>
-                  )}
-                  {economicData.indicators?.federalFundsRate && (
-                    <div style={styles.metricCard}>
-                      <p style={styles.metricLabel}>Fed Funds Rate</p>
-                      <p style={styles.metricValue}>
-                        {economicData.indicators.federalFundsRate.value}%
-                      </p>
-                      <p style={{ fontSize: '10px', color: '#6B7280', margin: '4px 0 0 0' }}>
-                        {economicData.indicators.federalFundsRate.date}
-                      </p>
-                    </div>
-                  )}
-                  {economicData.indicators?.cpi && (
-                    <div style={styles.metricCard}>
-                      <p style={styles.metricLabel}>CPI</p>
-                      <p style={styles.metricValue}>
-                        {economicData.indicators.cpi.value}
-                      </p>
-                      <p style={{ fontSize: '10px', color: '#6B7280', margin: '4px 0 0 0' }}>
-                        {economicData.indicators.cpi.date}
-                      </p>
-                    </div>
-                  )}
-                  {economicData.indicators?.unemploymentRate && (
-                    <div style={styles.metricCard}>
-                      <p style={styles.metricLabel}>Unemployment</p>
-                      <p style={styles.metricValue}>
-                        {economicData.indicators.unemploymentRate.value}%
-                      </p>
-                      <p style={{ fontSize: '10px', color: '#6B7280', margin: '4px 0 0 0' }}>
-                        {economicData.indicators.unemploymentRate.date}
-                      </p>
-                    </div>
-                  )}
+                  ))}
                 </div>
               </div>
             )}
 
-            {/* Commodities & Crypto */}
-            {economicData && (economicData.commodities || economicData.crypto) && (
+            {/* Commodities */}
+            {economicData && economicData.commodities && (
               <div>
-                <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '12px' }}>Commodities & Crypto</h3>
+                <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '12px' }}>Commodities</h3>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
-                  {economicData.commodities?.wtiCrude && (
-                    <div style={styles.metricCard}>
-                      <p style={styles.metricLabel}>WTI Crude Oil</p>
-                      <p style={styles.metricValue}>${economicData.commodities.wtiCrude.value}</p>
+                  {Object.entries(economicData.commodities).map(([key, value]) => (
+                    <div key={key} style={styles.metricCard}>
+                      <p style={styles.metricLabel}>{key.replace(/([A-Z])/g, ' $1').trim()}</p>
+                      <p style={styles.metricValue}>${value.value}</p>
                       <p style={{ fontSize: '10px', color: '#6B7280', margin: '4px 0 0 0' }}>
-                        per barrel
+                        {value.unit}
                       </p>
                     </div>
-                  )}
-                  {economicData.commodities?.naturalGas && (
-                    <div style={styles.metricCard}>
-                      <p style={styles.metricLabel}>Natural Gas</p>
-                      <p style={styles.metricValue}>${economicData.commodities.naturalGas.value}</p>
-                      <p style={{ fontSize: '10px', color: '#6B7280', margin: '4px 0 0 0' }}>
-                        per MMBtu
-                      </p>
-                    </div>
-                  )}
-                  {economicData.crypto?.bitcoin && (
-                    <div style={styles.metricCard}>
-                      <p style={styles.metricLabel}>Bitcoin</p>
-                      <p style={styles.metricValue}>${economicData.crypto.bitcoin.value.toLocaleString()}</p>
-                      <p style={{ fontSize: '10px', color: '#6B7280', margin: '4px 0 0 0' }}>
-                        BTC/USD
-                      </p>
-                    </div>
-                  )}
-                  {economicData.indicators?.dollarIndex && (
-                    <div style={styles.metricCard}>
-                      <p style={styles.metricLabel}>Dollar Index</p>
-                      <p style={styles.metricValue}>{economicData.indicators.dollarIndex.value}</p>
-                      <p style={{ fontSize: '10px', color: '#6B7280', margin: '4px 0 0 0' }}>
-                        DXY
-                      </p>
-                    </div>
-                  )}
+                  ))}
                 </div>
               </div>
             )}
@@ -1504,20 +1170,11 @@ const RoloApp = () => {
 
         {activeTab === 'alerts' && (
           <div style={{ padding: '20px' }}>
-            <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '8px' }}>Real-time Alerts</h2>
-            <p style={{ color: '#9CA3AF', marginBottom: '16px', fontSize: '14px' }}>
-              Market movements, volume spikes, and trading opportunities
-            </p>
-            
-            <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: '#1a1a1a', borderRadius: '12px' }}>
-              <p style={{ fontSize: '12px', color: '#6B7280', margin: 0 }}>
-                📊 Alerts monitor: Price movements &gt;3% • Volume spikes &gt;2x avg • Volatility changes • News sentiment shifts
-              </p>
-            </div>
+            <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px' }}>Real-time Alerts</h2>
             
             {alerts.length === 0 && (
               <div style={styles.loadingSpinner}>
-                <p>🔍 Scanning markets for unusual activity...</p>
+                <p>🔍 Scanning for alerts...</p>
               </div>
             )}
 
@@ -1561,9 +1218,976 @@ const RoloApp = () => {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+      </div>
+
+      {/* Bottom Navigation */}
+      <div style={styles.bottomNav}>
+        <div style={styles.navContainer}>
+          <button
+            onClick={() => setActiveTab('chat')}
+            style={activeTab === 'chat' ? styles.navButtonActive : styles.navButton}
+          >
+            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
+            <span style={styles.navLabel}>CHAT</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('ticker')}
+            style={activeTab === 'ticker' ? styles.navButtonActive : styles.navButton}
+          >
+            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            <span style={styles.navLabel}>TICKER</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('analysis')}
+            style={activeTab === 'analysis' ? styles.navButtonActive : styles.navButton}
+          >
+            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+            </svg>
+            <span style={styles.navLabel}>ANALYSIS</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('plays')}
+            style={activeTab === 'plays' ? styles.navButtonActive : styles.navButton}
+          >
+            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            <span style={styles.navLabel}>PLAYS</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('market')}
+            style={activeTab === 'market' ? styles.navButtonActive : styles.navButton}
+          >
+            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span style={styles.navLabel}>MARKET</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('alerts')}
+            style={activeTab === 'alerts' ? styles.navButtonActive : styles.navButton}
+          >
+            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+            </svg>
+            <span style={styles.navLabel}>ALERTS</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default RoloApp;
+</DOCUMENT>
+
+ <DOCUMENT filename="enhanced-stock-data.js">
+// netlify/functions/enhanced-stock-data.js
+// Enhanced stock data fetcher with session type
+
+exports.handler = async (event, context) => {
+    const headers = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Content-Type': 'application/json'
+    };
+
+    if (event.httpMethod === 'OPTIONS') {
+        return { statusCode: 200, headers, body: '' };
+    }
+
+    const { symbol } = event.queryStringParameters;
+    
+    if (!symbol) {
+        return {
+            statusCode: 400,
+            headers,
+            body: JSON.stringify({ error: 'Symbol is required' })
+        };
+    }
+
+    const ALPHA_VANTAGE_API_KEY = process.env.ALPHA_VANTAGE_API_KEY;
+
+    if (!ALPHA_VANTAGE_API_KEY) {
+        return {
+            statusCode: 500,
+            headers,
+            body: JSON.stringify({ error: 'Alpha Vantage API key not configured' })
+        };
+    }
+
+    try {
+        console.log(`[enhanced-stock-data.js] Fetching data for ${symbol}`);
+        
+        const quoteUrl = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${ALPHA_VANTAGE_API_KEY}`;
+        const quoteResponse = await fetch(quoteUrl);
+        const quoteData = await quoteResponse.json();
+        
+        if (!quoteData['Global Quote']) {
+            return {
+                statusCode: 500,
+                headers,
+                body: JSON.stringify({ error: 'Failed to fetch quote data' })
+            };
+        }
+
+        const quote = quoteData['Global Quote'];
+
+        // Determine market session
+        const now = new Date();
+        const estHour = (now.getUTCHours() - 5 + 24) % 24;
+        const estMinute = now.getUTCMinutes();
+        const day = now.getDay();
+        
+        let sessionType = 'Regular Market';
+        if (day === 0 || day === 6) {
+            sessionType = 'Weekend';
+        } else {
+            if (estHour >= 4 && (estHour < 9 || (estHour === 9 && estMinute < 30))) {
+                sessionType = 'Pre-Market';
+            } else if (estHour >= 16 && estHour < 20) {
+                sessionType = 'After Hours';
+            }
+        }
+
+        const data = {
+            symbol: quote['01. symbol'],
+            price: quote['05. price'],
+            change: quote['09. change'],
+            changePercent: quote['10. change percent'],
+            volume: quote['06. volume'],
+            high: quote['03. high'],
+            low: quote['04. low'],
+            open: quote['02. open'],
+            session: sessionType
+        };
+
+        return {
+            statusCode: 200,
+            headers,
+            body: JSON.stringify(data)
+        };
+    } catch (error) {
+        console.error('[enhanced-stock-data.js] Error:', error);
+        return {
+            statusCode: 500,
+            headers,
+            body: JSON.stringify({ error: error.message })
+        };
+    }
+};
+</DOCUMENT>
+
+ <DOCUMENT filename="news-data.js">
+// netlify/functions/news-data.js
+// Fetch news sentiment from Alpha Vantage
+
+exports.handler = async (event, context) => {
+    const headers = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Content-Type': 'application/json'
+    };
+
+    if (event.httpMethod === 'OPTIONS') {
+        return { statusCode: 200, headers, body: '' };
+    }
+
+    const { symbol } = event.queryStringParameters;
+
+    const ALPHA_VANTAGE_API_KEY = process.env.ALPHA_VANTAGE_API_KEY;
+
+    if (!ALPHA_VANTAGE_API_KEY) {
+        return {
+            statusCode: 500,
+            headers,
+            body: JSON.stringify({ error: 'Alpha Vantage API key not configured' })
+        };
+    }
+
+    try {
+        console.log(`[news-data.js] Fetching news for ${symbol || 'general market'}`);
+        
+        const newsUrl = `https://www.alphavantage.co/query?function=NEWS_SENTIMENT${symbol ? `&tickers=${symbol}` : ''}&apikey=${ALPHA_VANTAGE_API_KEY}`;
+        const newsResponse = await fetch(newsUrl);
+        const newsData = await newsResponse.json();
+
+        if (newsData.feed) {
+            const articles = newsData.feed.slice(0, 5).map(item => ({
+                title: item.title,
+                summary: item.summary,
+                sentiment: item.overall_sentiment_label,
+                score: item.overall_sentiment_score,
+                time: item.time_published,
+                url: item.url
+            }));
             
-            <div style={{ marginTop: '16px', fontSize: '12px', color: '#6B7280', textAlign: 'center' }}>
-              Auto-refreshes every 30 seconds • Based on real-time market data
+            const sentimentScores = newsData.feed.map(item => item.overall_sentiment_score);
+            const averageSentiment = sentimentScores.length > 0 ? sentimentScores.reduce((a, b) => a + b) / sentimentScores.length : 0;
+
+            const sentiment = {
+                averageScore: averageSentiment,
+                label: averageSentiment > 0.2 ? 'Bullish' :
+                       averageSentiment < -0.2 ? 'Bearish' : 'Neutral'
+            };
+
+            return {
+                statusCode: 200,
+                headers,
+                body: JSON.stringify({
+                    articles,
+                    sentiment
+                })
+            };
+        } else {
+            return {
+                statusCode: 500,
+                headers,
+                body: JSON.stringify({ error: 'No news data available' })
+            };
+        }
+    } catch (error) {
+        console.error('[news-data.js] Error:', error);
+        return {
+            statusCode: 500,
+            headers,
+            body: JSON.stringify({ error: error.message })
+        };
+    }
+};
+</DOCUMENT>
+
+ <DOCUMENT filename="technical-indicators.js">
+// netlify/functions/technical-indicators.js
+// Fetch multiple technical indicators from Alpha Vantage
+
+exports.handler = async (event, context) => {
+    const headers = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Content-Type': 'application/json'
+    };
+
+    if (event.httpMethod === 'OPTIONS') {
+        return { statusCode: 200, headers, body: '' };
+    }
+
+    const { symbol } = event.queryStringParameters;
+    
+    if (!symbol) {
+        return {
+            statusCode: 400,
+            headers,
+            body: JSON.stringify({ error: 'Symbol is required' })
+        };
+    }
+
+    const ALPHA_VANTAGE_API_KEY = process.env.ALPHA_VANTAGE_API_KEY;
+
+    if (!ALPHA_VANTAGE_API_KEY) {
+        return {
+            statusCode: 500,
+            headers,
+            body: JSON.stringify({ error: 'Alpha Vantage API key not configured' })
+        };
+    }
+
+    try {
+        console.log(`[technical-indicators.js] Fetching indicators for ${symbol}`);
+        
+        const indicators = {};
+
+        // RSI
+        const rsiUrl = `https://www.alphavantage.co/query?function=RSI&symbol=${symbol}&interval=daily&time_period=14&series_type=close&apikey=${ALPHA_VANTAGE_API_KEY}`;
+        const rsiResponse = await fetch(rsiUrl);
+        const rsiData = await rsiResponse.json();
+        if (rsiData['Technical Analysis: RSI']) {
+            const latestDate = Object.keys(rsiData['Technical Analysis: RSI'])[0];
+            indicators.rsi = rsiData['Technical Analysis: RSI'][latestDate].RSI;
+        }
+
+        // MACD
+        const macdUrl = `https://www.alphavantage.co/query?function=MACD&symbol=${symbol}&interval=daily&series_type=close&apikey=${ALPHA_VANTAGE_API_KEY}`;
+        const macdResponse = await fetch(macdUrl);
+        const macdData = await macdResponse.json();
+        if (macdData['Technical Analysis: MACD']) {
+            const latestDate = Object.keys(macdData['Technical Analysis: MACD'])[0];
+            indicators.macd = macdData['Technical Analysis: MACD'][latestDate].MACD;
+            indicators.macdSignal = macdData['Technical Analysis: MACD'][latestDate].MACD_Signal;
+            indicators.macdHist = macdData['Technical Analysis: MACD'][latestDate].MACD_Hist;
+        }
+
+        // Bollinger Bands
+        const bbandsUrl = `https://www.alphavantage.co/query?function=BBANDS&symbol=${symbol}&interval=daily&time_period=20&series_type=close&nbdevup=2&nbdevdn=2&apikey=${ALPHA_VANTAGE_API_KEY}`;
+        const bbandsResponse = await fetch(bbandsUrl);
+        const bbandsData = await bbandsResponse.json();
+        if (bbandsData['Technical Analysis: BBANDS']) {
+            const latestDate = Object.keys(bbandsData['Technical Analysis: BBANDS'])[0];
+            indicators.bbands = {
+              upper: bbandsData['Technical Analysis: BBANDS'][latestDate]['Real Upper Band'],
+              middle: bbandsData['Technical Analysis: BBANDS'][latestDate]['Real Middle Band'],
+              lower: bbandsData['Technical Analysis: BBANDS'][latestDate]['Real Lower Band']
+            };
+        }
+
+        // SMA
+        const smaUrl = `https://www.alphavantage.co/query?function=SMA&symbol=${symbol}&interval=daily&time_period=50&series_type=close&apikey=${ALPHA_VANTAGE_API_KEY}`;
+        const smaResponse = await fetch(smaUrl);
+        const smaData = await smaResponse.json();
+        if (smaData['Technical Analysis: SMA']) {
+            const latestDate = Object.keys(smaData['Technical Analysis: SMA'])[0];
+            indicators.sma50 = smaData['Technical Analysis: SMA'][latestDate].SMA;
+        }
+
+        // ADX
+        const adxUrl = `https://www.alphavantage.co/query?function=ADX&symbol=${symbol}&interval=daily&time_period=14&apikey=${ALPHA_VANTAGE_API_KEY}`;
+        const adxResponse = await fetch(adxUrl);
+        const adxData = await adxResponse.json();
+        if (adxData['Technical Analysis: ADX']) {
+            const latestDate = Object.keys(adxData['Technical Analysis: ADX'])[0];
+            indicators.adx = adxData['Technical Analysis: ADX'][latestDate].ADX;
+        }
+
+        return {
+            statusCode: 200,
+            headers,
+            body: JSON.stringify({
+                indicators
+            })
+        };
+    } catch (error) {
+        console.error('[technical-indicators.js] Error:', error);
+        return {
+            statusCode: 500,
+            headers,
+            body: JSON.stringify({ error: error.message })
+        };
+    }
+};
+</DOCUMENT>
+
+ <DOCUMENT filename="economic-indicators.js">
+// netlify/functions/economic-indicators.js
+// Fetch economic indicators and commodities from Alpha Vantage
+
+exports.handler = async (event, context) => {
+    const headers = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Content-Type': 'application/json'
+    };
+
+    if (event.httpMethod === 'OPTIONS') {
+        return { statusCode: 200, headers, body: '' };
+    }
+
+    const ALPHA_VANTAGE_API_KEY = process.env.ALPHA_VANTAGE_API_KEY;
+
+    if (!ALPHA_VANTAGE_API_KEY) {
+        return {
+            statusCode: 500,
+            headers,
+            body: JSON.stringify({ error: 'Alpha Vantage API key not configured' })
+        };
+    }
+
+    try {
+        console.log('[economic-indicators.js] Fetching economic data');
+        
+        const indicators = {};
+
+        // Fed Funds Rate
+        const fedUrl = `https://www.alphavantage.co/query?function=FEDERAL_FUNDS_RATE&interval=daily&apikey=${ALPHA_VANTAGE_API_KEY}`;
+        const fedResponse = await fetch(fedUrl);
+        const fedData = await fedResponse.json();
+        if (fedData.data && fedData.data.length > 0) {
+            indicators.fedFundsRate = fedData.data[0].value;
+        }
+
+        // CPI
+        const cpiUrl = `https://www.alphavantage.co/query?function=CPI&interval=monthly&apikey=${ALPHA_VANTAGE_API_KEY}`;
+        const cpiResponse = await fetch(cpiUrl);
+        const cpiData = await cpiResponse.json();
+        if (cpiData.data && cpiData.data.length > 0) {
+            indicators.cpi = cpiData.data[0].value;
+        }
+
+        // Unemployment
+        const unemploymentUrl = `https://www.alphavantage.co/query?function=UNEMPLOYMENT&apikey=${ALPHA_VANTAGE_API_KEY}`;
+        const unemploymentResponse = await fetch(unemploymentUrl);
+        const unemploymentData = await unemploymentResponse.json();
+        if (unemploymentData.data && unemploymentData.data.length > 0) {
+            indicators.unemployment = unemploymentData.data[0].value;
+        }
+
+        // Treasury Yield (10-year)
+        const treasuryUrl = `https://www.alphavantage.co/query?function=TREASURY_YIELD&interval=daily&maturity=10year&apikey=${ALPHA_VANTAGE_API_KEY}`;
+        const treasuryResponse = await treasuryUrl;
+        const treasuryData = await treasuryResponse.json();
+        if (treasuryData.data && treasuryData.data.length > 0) {
+            indicators.treasury10yr = treasuryData.data[0].value;
+        }
+
+        // Commodities - Oil
+        const oilUrl = `https://www.alphavantage.co/query?function=WTI&interval=daily&apikey=${ALPHA_VANTAGE_API_KEY}`;
+        const oilResponse = await fetch(oilUrl);
+        const oilData = await oilResponse.json();
+        if (oilData.data && oilData.data.length > 0) {
+            indicators.oil = oilData.data[0].value;
+        }
+
+        // Commodities - Natural Gas
+        const gasUrl = `https://www.alphavantage.co/query?function=NATURAL_GAS&interval=daily&apikey=${ALPHA_VANTAGE_API_KEY}`;
+        const gasResponse = await fetch(gasUrl);
+        const gasData = await gasResponse.json();
+        if (gasData.data && gasData.data.length > 0) {
+            indicators.naturalGas = gasData.data[0].value;
+        }
+
+        return {
+            statusCode: 200,
+            headers,
+            body: JSON.stringify({
+                indicators,
+                commodities: {
+                    oil: indicators.oil,
+                    naturalGas: indicators.naturalGas
+                }
+            })
+        };
+    } catch (error) {
+        console.error('[economic-indicators.js] Error:', error);
+        return {
+            statusCode: 500,
+            headers,
+            body: JSON.stringify({ error: error.message })
+        };
+    }
+};
+</DOCUMENT>
+
+ <DOCUMENT filename="market-dashboard.js">
+// netlify/functions/market-dashboard.js
+// Fetch major indices data from Alpha Vantage
+
+exports.handler = async (event, context) => {
+    const headers = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Content-Type': 'application/json'
+    };
+
+    if (event.httpMethod === 'OPTIONS') {
+        return { statusCode: 200, headers, body: '' };
+    }
+
+    const ALPHA_VANTAGE_API_KEY = process.env.ALPHA_VANTAGE_API_KEY;
+
+    if (!ALPHA_VANTAGE_API_KEY) {
+        return {
+            statusCode: 500,
+            headers,
+            body: JSON.stringify({ error: 'Alpha Vantage API key not configured' })
+        };
+    }
+
+    try {
+        console.log('[market-dashboard.js] Fetching market dashboard data');
+        
+        const symbols = {
+            sp500: 'SPX',
+            nasdaq: 'NDX',
+            dowJones: 'DJI'
+        };
+
+        const dashboardData = {};
+
+        for (const [key, symbol] of Object.entries(symbols)) {
+            const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${ALPHA_VANTAGE_API_KEY}`;
+            const response = await fetch(url);
+            const data = await response.json();
+            if (data['Global Quote']) {
+                const quote = data['Global Quote'];
+                dashboardData[key] = {
+                    symbol,
+                    price: quote['05. price'],
+                    change: quote['09. change'],
+                    changePercent: quote['10. change percent']
+                };
+            }
+        }
+
+        return {
+            statusCode: 200,
+            headers,
+            body: JSON.stringify(dashboardData)
+        };
+    } catch (error) {
+        console.error('[market-dashboard.js] Error:', error);
+        return {
+            statusCode: 500,
+            headers,
+            body: JSON.stringify({ error: error.message })
+        };
+    }
+};
+</DOCUMENT>
+
+ <DOCUMENT filename="realtime-alerts.js">
+// netlify/functions/realtime-alerts.js
+// Generate real-time market alerts based on movers and news
+
+exports.handler = async (event, context) => {
+    const headers = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Content-Type': 'application/json'
+    };
+
+    if (event.httpMethod === 'OPTIONS') {
+        return { statusCode: 200, headers, body: '' };
+    }
+
+    const ALPHA_VANTAGE_API_KEY = process.env.ALPHA_VANTAGE_API_KEY;
+
+    if (!ALPHA_VANTAGE_API_KEY) {
+        return {
+            statusCode: 500,
+            headers,
+            body: JSON.stringify({ error: 'Alpha Vantage API key not configured' })
+        };
+    }
+
+    try {
+        console.log('[realtime-alerts.js] Generating alerts');
+        
+        const moversUrl = `https://www.alphavantage.co/query?function=TOP_GAINERS_LOSERS&apikey=${ALPHA_VANTAGE_API_KEY}`;
+        const moversResponse = await fetch(moversUrl);
+        const moversData = await moversResponse.json();
+
+        const alerts = [];
+
+        // Volume spike alerts from top movers
+        if (moversData.top_gainers) {
+            moversData.top_gainers.slice(0, 3).forEach(gainer => {
+                alerts.push({
+                    title: `Volume Spike Alert: ${gainer.ticker}`,
+                    description: `${gainer.change_percentage} gain with high volume`,
+                    type: 'volume_spike',
+                    priority: 'high',
+                    timestamp: new Date().toISOString(),
+                    action: 'Consider buying on momentum'
+                });
+            });
+        }
+
+        if (moversData.top_losers) {
+            moversData.top_losers.slice(0, 3).forEach(loser => {
+                alerts.push({
+                    title: `Price Drop Alert: ${loser.ticker}`,
+                    description: `${loser.change_percentage} loss with high volume`,
+                    type: 'price_movement',
+                    priority: 'medium',
+                    timestamp: new Date().toISOString(),
+                    action: 'Monitor for potential rebound'
+                });
+            });
+        }
+
+        // Market volatility alert (example - would be based on VIX in full impl)
+        alerts.push({
+            title: 'Market Volatility Increasing',
+            description: 'VIX above 20, expect increased price swings',
+            type: 'market_volatility',
+            priority: 'high',
+            timestamp: new Date().toISOString(),
+            action: 'Tighten stop losses on open positions'
+        });
+
+        return {
+            statusCode: 200,
+            headers,
+            body: JSON.stringify({ alerts })
+        };
+    } catch (error) {
+        console.error('[realtime-alerts.js] Error:', error);
+        return {
+            statusCode: 500,
+            headers,
+            body: JSON.stringify({ error: error.message })
+        };
+    }
+};
+</DOCUMENT>
+
+ <DOCUMENT filename="enhanced-rolo-chat.js">
+// netlify/functions/enhanced-rolo-chat.js
+// Enhanced Gemini chat for Rolo with market context
+
+const { GoogleGenerativeAI } = require('@google/generative-ai');
+
+exports.handler = async (event, context) => {
+    const headers = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Content-Type': 'application/json'
+    };
+
+    if (event.httpMethod === 'OPTIONS') {
+        return { statusCode: 200, headers, body: '' };
+    }
+
+    const { message, context } = JSON.parse(event.body || '{}');
+    
+    if (!message) {
+        return {
+            statusCode: 400,
+            headers,
+            body: JSON.stringify({ error: 'Message is required' })
+        };
+    }
+
+    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+
+    if (!GEMINI_API_KEY) {
+        return {
+            statusCode: 500,
+            headers,
+            body: JSON.stringify({ error: 'Gemini API key not configured' })
+        };
+    }
+
+    try {
+        console.log(`[enhanced-rolo-chat.js] Processing message: ${message}`);
+        
+        const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+        const prompt = `You are Rolo, an expert AI trading assistant. Respond to the user's message in a natural, helpful way. Use the provided context to make your response more relevant and personalized.
+
+User Message: ${message}
+
+Context:
+- Currently viewing stock: ${context.selectedStock || 'None'}
+- Market status: ${context.marketStatus || 'Unknown'}
+- Has recent news: ${context.hasNews ? 'Yes' : 'No'}
+- Has technical data: ${context.hasTechnicals ? 'Yes' : 'No'}
+
+If the message is about trading, stocks, or analysis, provide actionable insights. Be concise but informative. Use emojis where appropriate to make the response engaging.`;
+
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text();
+
+        return {
+            statusCode: 200,
+            headers,
+            body: JSON.stringify({ response: text })
+        };
+    } catch (error) {
+        console.error('[enhanced-rolo-chat.js] Error:', error);
+        return {
+            statusCode: 500,
+            headers,
+            body: JSON.stringify({ error: error.message })
+        };
+    }
+};
+
+            <div style={styles.chatInputContainer}>
+              <input
+                type="text"
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                placeholder="Ask about stocks, analysis, or trading strategies..."
+                style={styles.chatInput}
+              />
+              <button
+                onClick={handleSendMessage}
+                style={styles.chatSendButton}
+              >
+                Send
+              </button>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'plays' && (
+          <div style={{ padding: '20px' }}>
+            <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '8px' }}>Smart Plays</h2>
+            <p style={{ color: '#9CA3AF', marginBottom: '16px', fontSize: '14px' }}>
+              AI-generated trading opportunities • Updated {marketStatus === 'Market Open' ? 'hourly' : 'at market open'}
+            </p>
+            
+            {smartPlays.length === 0 && (
+              <div style={styles.loadingSpinner}>
+                <p>🤖 Generating smart plays...</p>
+              </div>
+            )}
+
+            {smartPlays.map((play, idx) => (
+              <div key={idx} style={getPlayCardStyle(play.confidence)} className="animate-slide-in">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <h3 style={{ fontSize: '18px', fontWeight: '600', margin: 0, color: '#ffffff' }}>
+                    {play.emoji} {play.title}
+                  </h3>
+                  <span style={{
+                    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                    padding: '4px 12px',
+                    borderRadius: '12px',
+                    fontSize: '12px',
+                    color: '#ffffff'
+                  }}>
+                    {play.confidence}% Confidence
+                  </span>
+                </div>
+                
+                <div style={{ marginBottom: '12px' }}>
+                  <p style={{ margin: '0 0 4px 0', fontSize: '20px', fontWeight: 'bold', color: '#ffffff' }}>
+                    {play.ticker}
+                  </p>
+                  <p style={{ margin: '0', fontSize: '14px', color: '#E5E7EB' }}>
+                    Strategy: {play.strategy} • {play.timeframe}
+                  </p>
+                </div>
+
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(3, 1fr)', 
+                  gap: '12px',
+                  marginBottom: '12px',
+                  backgroundColor: 'rgba(0, 0, 0, 0.3)',
+                  padding: '12px',
+                  borderRadius: '8px'
+                }}>
+                  <div>
+                    <p style={{ margin: '0', fontSize: '12px', color: '#9CA3AF' }}>Entry</p>
+                    <p style={{ margin: '0', fontWeight: 'bold', color: '#10B981' }}>${play.entry}</p>
+                  </div>
+                  <div>
+                    <p style={{ margin: '0', fontSize: '12px', color: '#9CA3AF' }}>Stop Loss</p>
+                    <p style={{ margin: '0', fontWeight: 'bold', color: '#EF4444' }}>${play.stopLoss}</p>
+                  </div>
+                  <div>
+                    <p style={{ margin: '0', fontSize: '12px', color: '#9CA3AF' }}>Target</p>
+                    <p style={{ margin: '0', fontWeight: 'bold', color: '#10B981' }}>
+                      ${play.targets?.[0]} {play.targets?.[1] && `/ $${play.targets[1]}`}
+                    </p>
+                  </div>
+                </div>
+
+                <p style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#E5E7EB' }}>
+                  {play.reasoning}
+                </p>
+                
+                {play.newsImpact && (
+                  <p style={{ margin: '0', fontSize: '12px', color: '#F59E0B' }}>
+                    📰 {play.newsImpact}
+                  </p>
+                )}
+                
+                <div style={{ marginTop: '8px' }}>
+                  <span style={{
+                    fontSize: '12px',
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    backgroundColor: play.riskLevel === 'high' ? 'rgba(239, 68, 68, 0.2)' :
+                                    play.riskLevel === 'medium' ? 'rgba(245, 158, 11, 0.2)' :
+                                    'rgba(16, 185, 129, 0.2)',
+                    color: play.riskLevel === 'high' ? '#EF4444' :
+                           play.riskLevel === 'medium' ? '#F59E0B' : '#10B981'
+                  }}>
+                    {play.riskLevel?.toUpperCase()} RISK
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {activeTab === 'market' && (
+          <div style={{ padding: '20px' }}>
+            <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px' }}>Market Overview</h2>
+            
+            {/* Major Indices */}
+            <div style={{ marginBottom: '24px' }}>
+              <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '12px' }}>Major Indices</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {marketData.sp500 && (
+                  <div style={{
+                    ...styles.stockDetails,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                    <div>
+                      <p style={{ fontWeight: '600', margin: '0' }}>{marketData.sp500.symbol}</p>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <p style={{ fontSize: '18px', fontWeight: 'bold', margin: '0' }}>${marketData.sp500.price}</p>
+                      <p style={{ 
+                        fontSize: '14px', 
+                        color: parseFloat(marketData.sp500.change) >= 0 ? '#10B981' : '#EF4444',
+                        margin: '4px 0 0 0' 
+                      }}>
+                        {marketData.sp500.change} ({marketData.sp500.changePercent})
+                      </p>
+                    </div>
+                  </div>
+                )}
+                
+                {marketData.nasdaq && (
+                  <div style={{
+                    ...styles.stockDetails,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                    <div>
+                      <p style={{ fontWeight: '600', margin: '0' }}>{marketData.nasdaq.symbol}</p>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <p style={{ fontSize: '18px', fontWeight: 'bold', margin: '0' }}>${marketData.nasdaq.price}</p>
+                      <p style={{ 
+                        fontSize: '14px', 
+                        color: parseFloat(marketData.nasdaq.change) >= 0 ? '#10B981' : '#EF4444',
+                        margin: '4px 0 0 0' 
+                      }}>
+                        {marketData.nasdaq.change} ({marketData.nasdaq.changePercent})
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {marketData.dowJones && (
+                  <div style={{
+                    ...styles.stockDetails,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                    <div>
+                      <p style={{ fontWeight: '600', margin: '0' }}>{marketData.dowJones.symbol}</p>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <p style={{ fontSize: '18px', fontWeight: 'bold', margin: '0' }}>${marketData.dowJones.price}</p>
+                      <p style={{ 
+                        fontSize: '14px', 
+                        color: parseFloat(marketData.dowJones.change) >= 0 ? '#10B981' : '#EF4444',
+                        margin: '4px 0 0 0' 
+                      }}>
+                        {marketData.dowJones.change} ({marketData.dowJones.changePercent})
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Economic Indicators */}
+            {economicData && (
+              <div style={{ marginBottom: '24px' }}>
+                <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '12px' }}>Economic Indicators</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+                  {economicData.indicators && Object.entries(economicData.indicators).map(([key, value]) => (
+                    <div key={key} style={styles.metricCard}>
+                      <p style={styles.metricLabel}>{key.replace(/([A-Z])/g, ' $1').trim()}</p>
+                      <p style={styles.metricValue}>
+                        {value.value}{value.unit === '%' ? '%' : ''} 
+                      </p>
+                      <p style={{ fontSize: '10px', color: '#6B7280', margin: '4px 0 0 0' }}>
+                        {value.date}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Commodities */}
+            {economicData && economicData.commodities && (
+              <div>
+                <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '12px' }}>Commodities</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+                  {Object.entries(economicData.commodities).map(([key, value]) => (
+                    <div key={key} style={styles.metricCard}>
+                      <p style={styles.metricLabel}>{key.replace(/([A-Z])/g, ' $1').trim()}</p>
+                      <p style={styles.metricValue}>${value.value}</p>
+                      <p style={{ fontSize: '10px', color: '#6B7280', margin: '4px 0 0 0' }}>
+                        {value.unit}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'alerts' && (
+          <div style={{ padding: '20px' }}>
+            <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px' }}>Real-time Alerts</h2>
+            
+            {alerts.length === 0 && (
+              <div style={styles.loadingSpinner}>
+                <p>🔍 Scanning for alerts...</p>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {alerts.map((alert, idx) => (
+                <div 
+                  key={idx} 
+                  className="animate-slide-in"
+                  style={{
+                    backgroundColor: alert.priority === 'high' ? 'rgba(239, 68, 68, 0.1)' :
+                                    alert.priority === 'medium' ? 'rgba(245, 158, 11, 0.1)' :
+                                    'rgba(16, 185, 129, 0.1)',
+                    border: `1px solid ${alert.priority === 'high' ? '#EF4444' :
+                                         alert.priority === 'medium' ? '#F59E0B' : '#10B981'}`,
+                    borderRadius: '12px',
+                    padding: '16px'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'flex-start' }}>
+                    <span style={{ fontSize: '24px', marginRight: '12px' }}>
+                      {alert.type === 'price_movement' ? '📈' :
+                       alert.type === 'volume_spike' ? '📊' :
+                       alert.type === 'market_volatility' ? '🚨' :
+                       alert.type === 'market_calm' ? '🧘' : '🔔'}
+                    </span>
+                    <div style={{ flex: 1 }}>
+                      <h3 style={{ fontWeight: '600', margin: '0 0 4px 0' }}>{alert.title}</h3>
+                      <p style={{ fontSize: '14px', color: '#D1D5DB', margin: '0 0 8px 0' }}>
+                        {alert.description}
+                      </p>
+                      {alert.action && (
+                        <p style={{ fontSize: '12px', color: '#9CA3AF', margin: '0 0 4px 0' }}>
+                          💡 {alert.action}
+                        </p>
+                      )}
+                      <p style={{ fontSize: '12px', color: '#6B7280', margin: 0 }}>
+                        {new Date(alert.timestamp).toLocaleTimeString()}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -1575,8 +2199,6 @@ const RoloApp = () => {
           <button
             onClick={() => setActiveTab('chat')}
             style={activeTab === 'chat' ? styles.navButtonActive : styles.navButton}
-            onTouchStart={(e) => { e.currentTarget.style.opacity = '0.7'; }}
-            onTouchEnd={(e) => { e.currentTarget.style.opacity = '1'; }}
           >
             <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
@@ -1586,8 +2208,6 @@ const RoloApp = () => {
           <button
             onClick={() => setActiveTab('ticker')}
             style={activeTab === 'ticker' ? styles.navButtonActive : styles.navButton}
-            onTouchStart={(e) => { e.currentTarget.style.opacity = '0.7'; }}
-            onTouchEnd={(e) => { e.currentTarget.style.opacity = '1'; }}
           >
             <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -1597,8 +2217,6 @@ const RoloApp = () => {
           <button
             onClick={() => setActiveTab('analysis')}
             style={activeTab === 'analysis' ? styles.navButtonActive : styles.navButton}
-            onTouchStart={(e) => { e.currentTarget.style.opacity = '0.7'; }}
-            onTouchEnd={(e) => { e.currentTarget.style.opacity = '1'; }}
           >
             <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
@@ -1608,8 +2226,6 @@ const RoloApp = () => {
           <button
             onClick={() => setActiveTab('plays')}
             style={activeTab === 'plays' ? styles.navButtonActive : styles.navButton}
-            onTouchStart={(e) => { e.currentTarget.style.opacity = '0.7'; }}
-            onTouchEnd={(e) => { e.currentTarget.style.opacity = '1'; }}
           >
             <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -1619,8 +2235,6 @@ const RoloApp = () => {
           <button
             onClick={() => setActiveTab('market')}
             style={activeTab === 'market' ? styles.navButtonActive : styles.navButton}
-            onTouchStart={(e) => { e.currentTarget.style.opacity = '0.7'; }}
-            onTouchEnd={(e) => { e.currentTarget.style.opacity = '1'; }}
           >
             <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -1630,8 +2244,6 @@ const RoloApp = () => {
           <button
             onClick={() => setActiveTab('alerts')}
             style={activeTab === 'alerts' ? styles.navButtonActive : styles.navButton}
-            onTouchStart={(e) => { e.currentTarget.style.opacity = '0.7'; }}
-            onTouchEnd={(e) => { e.currentTarget.style.opacity = '1'; }}
           >
             <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
