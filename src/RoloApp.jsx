@@ -19,16 +19,8 @@ const RoloApp = () => {
   ]);
   const [chatInput, setChatInput] = useState('');
   const smartPlaysIntervalRef = useRef(null);
-  const autoRefreshIntervalRef = useRef(null);
-  
-  // Editable popular stocks with local storage persistence
-  const [popularStocks, setPopularStocks] = useState(() => {
-    const saved = localStorage.getItem('popularStocks');
-    return saved ? JSON.parse(saved) : ['AAPL', 'TSLA', 'NVDA', 'SPY', 'QQQ', 'META', 'AMD', 'GOOGL', 'MSFT'];
-  });
-  const [isEditingStocks, setIsEditingStocks] = useState(false);
-  const [editingSymbol, setEditingSymbol] = useState('');
-  const [editingIndex, setEditingIndex] = useState(null);
+
+  const popularStocks = ['AAPL', 'TSLA', 'NVDA', 'SPY', 'QQQ', 'META', 'AMD', 'GOOGL', 'MSFT'];
 
   // Styles
   const styles = {
@@ -334,125 +326,6 @@ const RoloApp = () => {
     },
   };
 
-  // Check market status with more detailed sessions
-  useEffect(() => {
-    const checkMarketStatus = () => {
-      const now = new Date();
-      const hours = now.getUTCHours() - 5; // EST
-      const minutes = now.getMinutes();
-      const day = now.getDay();
-      const time = hours + (minutes / 60);
-      
-      if (day === 0 || day === 6) {
-        // Futures open Sunday 6 PM EST
-        if (day === 0 && hours >= 18) {
-          setMarketStatus('Futures Open');
-        } else {
-          setMarketStatus('Weekend');
-        }
-      } else if (time >= 4 && time < 9.5) {
-        setMarketStatus('Pre-Market');
-      } else if (time >= 9.5 && time < 16) {
-        setMarketStatus('Market Open');
-      } else if (time >= 16 && time < 20) {
-        setMarketStatus('After Hours');
-      } else if (hours >= 20 || hours < 4) {
-        setMarketStatus('Futures Open');
-      } else {
-        setMarketStatus('Market Closed');
-      }
-    };
-    
-    checkMarketStatus();
-    const interval = setInterval(checkMarketStatus, 60000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Save popular stocks to localStorage when changed
-  useEffect(() => {
-    localStorage.setItem('popularStocks', JSON.stringify(popularStocks));
-  }, [popularStocks]);
-
-  // Auto-refresh stock data based on market session
-  useEffect(() => {
-    const refreshInterval = marketStatus === 'Market Open' ? 60000 : // 1 minute during market hours
-                          marketStatus === 'Pre-Market' || marketStatus === 'After Hours' ? 120000 : // 2 minutes
-                          300000; // 5 minutes otherwise
-    
-    // Clear existing interval
-    if (autoRefreshIntervalRef.current) {
-      clearInterval(autoRefreshIntervalRef.current);
-    }
-    
-    // Set up new interval
-    autoRefreshIntervalRef.current = setInterval(() => {
-      // Refresh all popular stocks
-      popularStocks.forEach(symbol => {
-        fetchStockData(symbol);
-      });
-      // Refresh selected stock
-      if (selectedStock) {
-        fetchStockData(selectedStock);
-      }
-    }, refreshInterval);
-    
-    return () => {
-      if (autoRefreshIntervalRef.current) {
-        clearInterval(autoRefreshIntervalRef.current);
-      }
-    };
-  }, [marketStatus, popularStocks, selectedStock]);
-
-  // Fetch stock data
-  const fetchStockData = async (symbol) => {
-    setIsLoading(true);
-    try {
-      const response = await fetch(`/.netlify/functions/enhanced-stock-data?symbol=${symbol}`);
-      const data = await response.json();
-      if (response.ok) {
-        setStockData(prev => ({ ...prev, [symbol]: data }));
-      }
-    } catch (error) {
-      console.error('Error fetching stock data:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleEditStock = (index) => {
-    setEditingIndex(index);
-    setEditingSymbol(popularStocks[index]);
-    setIsEditingStocks(true);
-  };
-
-  const handleSaveStock = () => {
-    if (editingSymbol && editingIndex !== null) {
-      const newStocks = [...popularStocks];
-      newStocks[editingIndex] = editingSymbol.toUpperCase();
-      setPopularStocks(newStocks);
-      // Fetch data for the new stock
-      fetchStockData(editingSymbol.toUpperCase());
-    }
-    setIsEditingStocks(false);
-    setEditingIndex(null);
-    setEditingSymbol('');
-  };
-
-  const handleAddStock = () => {
-    if (popularStocks.length < 12) { // Limit to 12 stocks
-      const newStocks = [...popularStocks, 'NEW'];
-      setPopularStocks(newStocks);
-      handleEditStock(newStocks.length - 1);
-    }
-  };
-
-  const handleRemoveStock = (index) => {
-    if (popularStocks.length > 3) { // Keep at least 3 stocks
-      const newStocks = popularStocks.filter((_, i) => i !== index);
-      setPopularStocks(newStocks);
-    }
-  };
-
   // Add keyframes for animations
   useEffect(() => {
     const style = document.createElement('style');
@@ -472,6 +345,47 @@ const RoloApp = () => {
     document.head.appendChild(style);
     return () => document.head.removeChild(style);
   }, []);
+
+  // Check market status
+  useEffect(() => {
+    const checkMarketStatus = () => {
+      const now = new Date();
+      const hours = now.getUTCHours() - 5; // EST
+      const day = now.getDay();
+      
+      if (day === 0 || day === 6) {
+        setMarketStatus('Weekend');
+      } else if (hours >= 4 && hours < 9.5) {
+        setMarketStatus('Pre-Market');
+      } else if (hours >= 9.5 && hours < 16) {
+        setMarketStatus('Market Open');
+      } else if (hours >= 16 && hours < 20) {
+        setMarketStatus('After Hours');
+      } else {
+        setMarketStatus('Market Closed');
+      }
+    };
+    
+    checkMarketStatus();
+    const interval = setInterval(checkMarketStatus, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Fetch stock data
+  const fetchStockData = async (symbol) => {
+    setIsLoading(true);
+    try {
+      const response = await fetch(`/.netlify/functions/enhanced-stock-data?symbol=${symbol}`);
+      const data = await response.json();
+      if (response.ok) {
+        setStockData(prev => ({ ...prev, [symbol]: data }));
+      }
+    } catch (error) {
+      console.error('Error fetching stock data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Fetch AI Analysis
   const fetchAIAnalysis = async (symbol) => {
@@ -578,19 +492,15 @@ const RoloApp = () => {
 
   // Setup smart plays interval during market hours
   useEffect(() => {
-    if (marketStatus === 'Market Open' || marketStatus === 'Pre-Market' || marketStatus === 'After Hours') {
+    if (marketStatus === 'Market Open') {
       // Fetch immediately
       fetchSmartPlays();
       
-      // Then fetch every hour during market hours, every 2 hours otherwise
-      const interval = marketStatus === 'Market Open' ? 3600000 : 7200000;
+      // Then fetch every hour
       smartPlaysIntervalRef.current = setInterval(() => {
         fetchSmartPlays();
-      }, interval);
+      }, 3600000); // 1 hour
     } else {
-      // Fetch once for closed market
-      fetchSmartPlays();
-      
       // Clear interval when market is closed
       if (smartPlaysIntervalRef.current) {
         clearInterval(smartPlaysIntervalRef.current);
@@ -680,7 +590,7 @@ const RoloApp = () => {
     const baseStyle = { ...styles.marketStatusBadge };
     if (marketStatus === 'Market Open') {
       return { ...baseStyle, backgroundColor: '#064E3B', color: '#10B981' };
-    } else if (marketStatus === 'Pre-Market' || marketStatus === 'After Hours' || marketStatus === 'Futures Open') {
+    } else if (marketStatus === 'Pre-Market' || marketStatus === 'After Hours') {
       return { ...baseStyle, backgroundColor: '#7C2D12', color: '#F59E0B' };
     }
     return { ...baseStyle, backgroundColor: '#1F2937', color: '#9CA3AF' };
@@ -690,7 +600,7 @@ const RoloApp = () => {
     const baseStyle = { ...styles.marketStatusDot };
     if (marketStatus === 'Market Open') {
       return { ...baseStyle, backgroundColor: '#10B981' };
-    } else if (marketStatus === 'Pre-Market' || marketStatus === 'After Hours' || marketStatus === 'Futures Open') {
+    } else if (marketStatus === 'Pre-Market' || marketStatus === 'After Hours') {
       return { ...baseStyle, backgroundColor: '#F59E0B' };
     }
     return { ...baseStyle, backgroundColor: '#9CA3AF' };
@@ -750,97 +660,28 @@ const RoloApp = () => {
               <div style={styles.stocksSection}>
                 <h2 style={styles.sectionTitle}>
                   <span style={{ marginRight: '8px' }}>📈</span> Popular Stocks
-                  <button
-                    onClick={() => setIsEditingStocks(!isEditingStocks)}
-                    style={{
-                      marginLeft: 'auto',
-                      backgroundColor: 'transparent',
-                      border: '1px solid #3B82F6',
-                      color: '#3B82F6',
-                      borderRadius: '8px',
-                      padding: '4px 12px',
-                      fontSize: '14px',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    {isEditingStocks ? 'Done' : 'Edit'}
-                  </button>
                 </h2>
                 <div style={styles.stockGrid}>
-                  {popularStocks.map((symbol, index) => {
+                  {popularStocks.map(symbol => {
                     const data = stockData[symbol];
-                    const isEditing = isEditingStocks && editingIndex === index;
-                    
                     return (
                       <div
-                        key={index}
-                        onClick={() => !isEditingStocks && setSelectedStock(symbol)}
-                        style={{
-                          ...((selectedStock === symbol && !isEditingStocks) ? styles.stockCardActive : styles.stockCard),
-                          position: 'relative'
-                        }}
+                        key={symbol}
+                        onClick={() => setSelectedStock(symbol)}
+                        style={selectedStock === symbol ? styles.stockCardActive : styles.stockCard}
                         onMouseOver={(e) => {
-                          if (selectedStock !== symbol && !isEditingStocks) {
+                          if (selectedStock !== symbol) {
                             e.currentTarget.style.borderColor = '#4B5563';
                           }
                         }}
                         onMouseOut={(e) => {
-                          if (selectedStock !== symbol && !isEditingStocks) {
+                          if (selectedStock !== symbol) {
                             e.currentTarget.style.borderColor = '#374151';
                           }
                         }}
                       >
-                        {isEditingStocks && (
-                          <button
-                            onClick={() => handleRemoveStock(index)}
-                            style={{
-                              position: 'absolute',
-                              top: '-8px',
-                              right: '-8px',
-                              backgroundColor: '#EF4444',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '50%',
-                              width: '20px',
-                              height: '20px',
-                              cursor: 'pointer',
-                              fontSize: '12px',
-                              lineHeight: '1'
-                            }}
-                          >
-                            ×
-                          </button>
-                        )}
-                        
-                        {isEditing ? (
-                          <input
-                            type="text"
-                            value={editingSymbol}
-                            onChange={(e) => setEditingSymbol(e.target.value.toUpperCase())}
-                            onBlur={handleSaveStock}
-                            onKeyPress={(e) => e.key === 'Enter' && handleSaveStock()}
-                            style={{
-                              backgroundColor: 'transparent',
-                              border: 'none',
-                              color: 'white',
-                              textAlign: 'center',
-                              fontSize: '14px',
-                              fontWeight: 'bold',
-                              width: '100%',
-                              outline: 'none'
-                            }}
-                            autoFocus
-                          />
-                        ) : (
-                          <div 
-                            onClick={() => isEditingStocks && handleEditStock(index)}
-                            style={{ cursor: isEditingStocks ? 'pointer' : 'default' }}
-                          >
-                            <div style={styles.stockSymbol}>{symbol}</div>
-                          </div>
-                        )}
-                        
-                        {data && !isEditing && (
+                        <div style={styles.stockSymbol}>{symbol}</div>
+                        {data && (
                           <>
                             <div style={styles.stockPrice}>${data.price}</div>
                             <div style={{
@@ -849,38 +690,11 @@ const RoloApp = () => {
                             }}>
                               {data.changePercent}
                             </div>
-                            <div style={{
-                              fontSize: '10px',
-                              color: '#6B7280',
-                              marginTop: '4px'
-                            }}>
-                              {data.sessionLabel}
-                            </div>
                           </>
                         )}
                       </div>
                     );
                   })}
-                  
-                  {isEditingStocks && popularStocks.length < 12 && (
-                    <div
-                      onClick={handleAddStock}
-                      style={{
-                        ...styles.stockCard,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        borderStyle: 'dashed'
-                      }}
-                    >
-                      <span style={{ fontSize: '24px' }}>+</span>
-                    </div>
-                  )}
-                </div>
-                
-                <div style={{ marginTop: '12px', fontSize: '12px', color: '#6B7280', textAlign: 'center' }}>
-                  Prices update every {marketStatus === 'Market Open' ? '1-2' : '2-5'} minutes
                 </div>
               </div>
 
@@ -890,7 +704,7 @@ const RoloApp = () => {
                   <div style={styles.stockDetailsHeader}>
                     <div>
                       <h2 style={styles.stockDetailsTitle}>{selectedStock}</h2>
-                      <p style={styles.stockDetailsStatus}>{stockData[selectedStock].sessionLabel || marketStatus}</p>
+                      <p style={styles.stockDetailsStatus}>{marketStatus}</p>
                     </div>
                     <div style={styles.stockDetailsPrice}>
                       <div style={styles.stockDetailsPriceValue}>
@@ -922,10 +736,6 @@ const RoloApp = () => {
                       <p style={styles.metricLabel}>OPEN</p>
                       <p style={styles.metricValue}>${stockData[selectedStock].open}</p>
                     </div>
-                  </div>
-                  
-                  <div style={{ marginTop: '12px', fontSize: '12px', color: '#6B7280', textAlign: 'center' }}>
-                    Last updated: {new Date(stockData[selectedStock].dataTimestamp || Date.now()).toLocaleTimeString()}
                   </div>
                 </div>
               )}
@@ -1144,19 +954,12 @@ const RoloApp = () => {
           <div style={{ padding: '20px' }}>
             <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '8px' }}>Smart Plays</h2>
             <p style={{ color: '#9CA3AF', marginBottom: '16px', fontSize: '14px' }}>
-              AI-generated trading opportunities • Updated {marketStatus === 'Market Open' ? 'hourly' : marketStatus.includes('Market') ? 'every 2 hours' : 'at market open'}
+              AI-generated trading opportunities • Updated {marketStatus === 'Market Open' ? 'hourly' : 'at market open'}
             </p>
-            
-            <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: '#1a1a1a', borderRadius: '12px' }}>
-              <p style={{ fontSize: '12px', color: '#6B7280', margin: 0 }}>
-                🤖 AI analyzes: Real-time prices • News sentiment • Technical indicators • Market momentum • Volume patterns
-              </p>
-            </div>
             
             {smartPlays.length === 0 && (
               <div style={styles.loadingSpinner}>
-                <p>🤖 Analyzing markets with AI to find opportunities...</p>
-                <p style={{ fontSize: '12px', color: '#6B7280', marginTop: '8px' }}>This may take a moment</p>
+                <p>🤖 Generating smart plays...</p>
               </div>
             )}
 
@@ -1221,7 +1024,7 @@ const RoloApp = () => {
                   </p>
                 )}
                 
-                <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ marginTop: '8px' }}>
                   <span style={{
                     fontSize: '12px',
                     padding: '2px 8px',
@@ -1234,36 +1037,15 @@ const RoloApp = () => {
                   }}>
                     {play.riskLevel?.toUpperCase()} RISK
                   </span>
-                  <span style={{ fontSize: '10px', color: '#6B7280' }}>
-                    Generated: {new Date().toLocaleTimeString()}
-                  </span>
                 </div>
               </div>
             ))}
-            
-            {smartPlays.length > 0 && (
-              <div style={{ marginTop: '16px', fontSize: '12px', color: '#6B7280', textAlign: 'center' }}>
-                Based on real-time market data • Not financial advice
-              </div>
-            )}
           </div>
         )}
 
         {activeTab === 'market' && (
           <div style={{ padding: '20px' }}>
             <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px' }}>Market Overview</h2>
-            
-            {/* Market Status Badge */}
-            <div style={{ marginBottom: '16px', textAlign: 'center' }}>
-              <span style={{
-                ...getMarketStatusStyle(),
-                fontSize: '14px',
-                padding: '8px 16px'
-              }}>
-                <span style={getMarketStatusDotStyle()}></span>
-                {marketStatus}
-              </span>
-            </div>
             
             {/* Major Indices */}
             <div style={{ marginBottom: '24px' }}>
@@ -1278,9 +1060,6 @@ const RoloApp = () => {
                   }}>
                     <div>
                       <p style={{ fontWeight: '600', margin: '0' }}>{marketData.sp500.symbol}</p>
-                      <p style={{ fontSize: '12px', color: '#6B7280', margin: '2px 0 0 0' }}>
-                        {marketStatus.includes('Futures') ? 'Futures' : 'Live'}
-                      </p>
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <p style={{ fontSize: '18px', fontWeight: 'bold', margin: '0' }}>${marketData.sp500.price}</p>
@@ -1304,9 +1083,6 @@ const RoloApp = () => {
                   }}>
                     <div>
                       <p style={{ fontWeight: '600', margin: '0' }}>{marketData.nasdaq.symbol}</p>
-                      <p style={{ fontSize: '12px', color: '#6B7280', margin: '2px 0 0 0' }}>
-                        {marketStatus.includes('Futures') ? 'Futures' : 'Live'}
-                      </p>
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <p style={{ fontSize: '18px', fontWeight: 'bold', margin: '0' }}>${marketData.nasdaq.price}</p>
@@ -1330,9 +1106,6 @@ const RoloApp = () => {
                   }}>
                     <div>
                       <p style={{ fontWeight: '600', margin: '0' }}>{marketData.dowJones.symbol}</p>
-                      <p style={{ fontSize: '12px', color: '#6B7280', margin: '2px 0 0 0' }}>
-                        {marketStatus.includes('Futures') ? 'Futures' : 'Live'}
-                      </p>
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <p style={{ fontSize: '18px', fontWeight: 'bold', margin: '0' }}>${marketData.dowJones.price}</p>
@@ -1352,97 +1125,37 @@ const RoloApp = () => {
             {/* Economic Indicators */}
             {economicData && (
               <div style={{ marginBottom: '24px' }}>
-                <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '12px' }}>Key Economic Indicators</h3>
+                <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '12px' }}>Economic Indicators</h3>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
-                  {economicData.indicators?.treasury10Year && (
-                    <div style={styles.metricCard}>
-                      <p style={styles.metricLabel}>10-Year Treasury</p>
+                  {economicData.indicators && Object.entries(economicData.indicators).map(([key, value]) => (
+                    <div key={key} style={styles.metricCard}>
+                      <p style={styles.metricLabel}>{key.replace(/([A-Z])/g, ' $1').trim()}</p>
                       <p style={styles.metricValue}>
-                        {economicData.indicators.treasury10Year.value}%
+                        {value.value}{value.unit === '%' ? '%' : ''} 
                       </p>
                       <p style={{ fontSize: '10px', color: '#6B7280', margin: '4px 0 0 0' }}>
-                        {economicData.indicators.treasury10Year.date}
+                        {value.date}
                       </p>
                     </div>
-                  )}
-                  {economicData.indicators?.federalFundsRate && (
-                    <div style={styles.metricCard}>
-                      <p style={styles.metricLabel}>Fed Funds Rate</p>
-                      <p style={styles.metricValue}>
-                        {economicData.indicators.federalFundsRate.value}%
-                      </p>
-                      <p style={{ fontSize: '10px', color: '#6B7280', margin: '4px 0 0 0' }}>
-                        {economicData.indicators.federalFundsRate.date}
-                      </p>
-                    </div>
-                  )}
-                  {economicData.indicators?.cpi && (
-                    <div style={styles.metricCard}>
-                      <p style={styles.metricLabel}>CPI</p>
-                      <p style={styles.metricValue}>
-                        {economicData.indicators.cpi.value}
-                      </p>
-                      <p style={{ fontSize: '10px', color: '#6B7280', margin: '4px 0 0 0' }}>
-                        {economicData.indicators.cpi.date}
-                      </p>
-                    </div>
-                  )}
-                  {economicData.indicators?.unemploymentRate && (
-                    <div style={styles.metricCard}>
-                      <p style={styles.metricLabel}>Unemployment</p>
-                      <p style={styles.metricValue}>
-                        {economicData.indicators.unemploymentRate.value}%
-                      </p>
-                      <p style={{ fontSize: '10px', color: '#6B7280', margin: '4px 0 0 0' }}>
-                        {economicData.indicators.unemploymentRate.date}
-                      </p>
-                    </div>
-                  )}
+                  ))}
                 </div>
               </div>
             )}
 
-            {/* Commodities & Crypto */}
-            {economicData && (economicData.commodities || economicData.crypto) && (
+            {/* Commodities */}
+            {economicData && economicData.commodities && (
               <div>
-                <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '12px' }}>Commodities & Crypto</h3>
+                <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '12px' }}>Commodities</h3>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
-                  {economicData.commodities?.wtiCrude && (
-                    <div style={styles.metricCard}>
-                      <p style={styles.metricLabel}>WTI Crude Oil</p>
-                      <p style={styles.metricValue}>${economicData.commodities.wtiCrude.value}</p>
+                  {Object.entries(economicData.commodities).map(([key, value]) => (
+                    <div key={key} style={styles.metricCard}>
+                      <p style={styles.metricLabel}>{key.replace(/([A-Z])/g, ' $1').trim()}</p>
+                      <p style={styles.metricValue}>${value.value}</p>
                       <p style={{ fontSize: '10px', color: '#6B7280', margin: '4px 0 0 0' }}>
-                        per barrel
+                        {value.unit}
                       </p>
                     </div>
-                  )}
-                  {economicData.commodities?.naturalGas && (
-                    <div style={styles.metricCard}>
-                      <p style={styles.metricLabel}>Natural Gas</p>
-                      <p style={styles.metricValue}>${economicData.commodities.naturalGas.value}</p>
-                      <p style={{ fontSize: '10px', color: '#6B7280', margin: '4px 0 0 0' }}>
-                        per MMBtu
-                      </p>
-                    </div>
-                  )}
-                  {economicData.crypto?.bitcoin && (
-                    <div style={styles.metricCard}>
-                      <p style={styles.metricLabel}>Bitcoin</p>
-                      <p style={styles.metricValue}>${economicData.crypto.bitcoin.value.toLocaleString()}</p>
-                      <p style={{ fontSize: '10px', color: '#6B7280', margin: '4px 0 0 0' }}>
-                        BTC/USD
-                      </p>
-                    </div>
-                  )}
-                  {economicData.indicators?.dollarIndex && (
-                    <div style={styles.metricCard}>
-                      <p style={styles.metricLabel}>Dollar Index</p>
-                      <p style={styles.metricValue}>{economicData.indicators.dollarIndex.value}</p>
-                      <p style={{ fontSize: '10px', color: '#6B7280', margin: '4px 0 0 0' }}>
-                        DXY
-                      </p>
-                    </div>
-                  )}
+                  ))}
                 </div>
               </div>
             )}
@@ -1451,20 +1164,11 @@ const RoloApp = () => {
 
         {activeTab === 'alerts' && (
           <div style={{ padding: '20px' }}>
-            <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '8px' }}>Real-time Alerts</h2>
-            <p style={{ color: '#9CA3AF', marginBottom: '16px', fontSize: '14px' }}>
-              Market movements, volume spikes, and trading opportunities
-            </p>
-            
-            <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: '#1a1a1a', borderRadius: '12px' }}>
-              <p style={{ fontSize: '12px', color: '#6B7280', margin: 0 }}>
-                📊 Alerts monitor: Price movements &gt;3% • Volume spikes &gt;2x avg • Volatility changes • News sentiment shifts
-              </p>
-            </div>
+            <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px' }}>Real-time Alerts</h2>
             
             {alerts.length === 0 && (
               <div style={styles.loadingSpinner}>
-                <p>🔍 Scanning markets for unusual activity...</p>
+                <p>🔍 Scanning for alerts...</p>
               </div>
             )}
 
@@ -1507,10 +1211,6 @@ const RoloApp = () => {
                   </div>
                 </div>
               ))}
-            </div>
-            
-            <div style={{ marginTop: '16px', fontSize: '12px', color: '#6B7280', textAlign: 'center' }}>
-              Auto-refreshes every 30 seconds • Based on real-time market data
             </div>
           </div>
         )}
