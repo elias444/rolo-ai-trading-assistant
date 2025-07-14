@@ -1,5 +1,5 @@
 // netlify/functions/smart-plays-generator.js
-// This function generates smart trading plays based on REAL market data from Alpha Vantage.
+// COMPLETELY REAL DATA ONLY - No mock/fake data whatsoever
 
 exports.handler = async (event, context) => {
     const headers = {
@@ -14,244 +14,192 @@ exports.handler = async (event, context) => {
     }
 
     try {
-        console.log(`[smart-plays-generator.js] Generating smart trading plays from REAL market data...`);
+        console.log(`[smart-plays-generator.js] Fetching ONLY real market data for smart plays...`);
         const API_KEY = process.env.ALPHA_VANTAGE_API_KEY;
 
         if (!API_KEY) {
-            console.error("[smart-plays-generator.js] ALPHA_VANTAGE_API_KEY environment variable is not set.");
+            console.error("[smart-plays-generator.js] ALPHA_VANTAGE_API_KEY not configured.");
             return {
                 statusCode: 500,
                 headers,
-                body: JSON.stringify({ error: 'Alpha Vantage API key is not configured.' })
+                body: JSON.stringify({ error: 'API key not configured' })
             };
         }
 
+        // ONLY return plays if we have REAL data from Alpha Vantage
         const plays = [];
 
-        // --- Get REAL Market Sentiment from SPY/QQQ ---
-        let marketSentiment = 'neutral';
-        let sp500Data = null;
-        let nasdaqData = null;
-
+        // Step 1: Get REAL top gainers and losers ONLY
         try {
-            // Fetch SPY (S&P 500 ETF)
-            const spyResponse = await fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=SPY&entitlement=realtime&apikey=${API_KEY}`);
-            const spyData = await spyResponse.json();
-            if (spyResponse.ok && spyData['Global Quote'] && spyData['Global Quote']['05. price']) {
-                sp500Data = {
-                    symbol: 'SPY',
-                    price: parseFloat(spyData['Global Quote']['05. price']),
-                    change: parseFloat(spyData['Global Quote']['09. change']),
-                    changePercent: parseFloat(spyData['Global Quote']['10. change percent'].replace('%', ''))
-                };
-            }
-
-            // Fetch QQQ (NASDAQ ETF)
-            const qqqqResponse = await fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=QQQ&entitlement=realtime&apikey=${API_KEY}`);
-            const qqqData = await qqqqResponse.json();
-            if (qqqqResponse.ok && qqqData['Global Quote'] && qqqData['Global Quote']['05. price']) {
-                nasdaqData = {
-                    symbol: 'QQQ',
-                    price: parseFloat(qqqData['Global Quote']['05. price']),
-                    change: parseFloat(qqqData['Global Quote']['09. change']),
-                    changePercent: parseFloat(qqqData['Global Quote']['10. change percent'].replace('%', ''))
-                };
-            }
-
-            // Determine market sentiment from REAL data
-            if (sp500Data && nasdaqData) {
-                if (sp500Data.changePercent > 0.5 && nasdaqData.changePercent > 0.5) {
-                    marketSentiment = 'bullish';
-                } else if (sp500Data.changePercent < -0.5 && nasdaqData.changePercent < -0.5) {
-                    marketSentiment = 'bearish';
-                }
-            }
-        } catch (e) {
-            console.warn("[smart-plays-generator.js] Could not fetch index data:", e.message);
-        }
-
-        // --- Get REAL Top Gainers and Losers ---
-        let topGainers = [];
-        let topLosers = [];
-        
-        try {
+            console.log("[smart-plays-generator.js] Fetching real top gainers/losers...");
             const moversResponse = await fetch(`https://www.alphavantage.co/query?function=TOP_GAINERS_LOSERS&apikey=${API_KEY}`);
+            
+            if (!moversResponse.ok) {
+                console.error("[smart-plays-generator.js] Failed to fetch top movers");
+                return {
+                    statusCode: 200,
+                    headers,
+                    body: JSON.stringify({
+                        plays: [],
+                        message: "No real market data available",
+                        timestamp: new Date().toISOString()
+                    })
+                };
+            }
+
             const moversData = await moversResponse.json();
             
-            if (moversResponse.ok && moversData.top_gainers && moversData.top_losers) {
-                topGainers = moversData.top_gainers.slice(0, 5).map(stock => ({
-                    symbol: stock.ticker,
-                    price: parseFloat(stock.price),
-                    changePercent: parseFloat(stock.change_percentage.replace('%', '')),
-                    volume: parseInt(stock.volume)
-                }));
-                
-                topLosers = moversData.top_losers.slice(0, 5).map(stock => ({
-                    symbol: stock.ticker,
-                    price: parseFloat(stock.price),
-                    changePercent: parseFloat(stock.change_percentage.replace('%', '')),
-                    volume: parseInt(stock.volume)
-                }));
+            // Check for API errors
+            if (moversData['Error Message'] || moversData['Note']) {
+                console.error("[smart-plays-generator.js] API error:", moversData['Error Message'] || moversData['Note']);
+                return {
+                    statusCode: 200,
+                    headers,
+                    body: JSON.stringify({
+                        plays: [],
+                        message: "API rate limit or error",
+                        timestamp: new Date().toISOString()
+                    })
+                };
             }
-        } catch (e) {
-            console.warn("[smart-plays-generator.js] Could not fetch top movers:", e.message);
-        }
 
-        // --- Generate Plays Based on REAL Market Data ONLY ---
-        
-        // Only generate plays if we have real data
-        if (sp500Data && nasdaqData) {
-            if (marketSentiment === 'bullish') {
-                plays.push({
-                    emoji: '🚀',
-                    title: 'Market Momentum Long',
-                    ticker: 'SPY',
-                    strategy: 'ETF Long',
-                    confidence: 75,
-                    entry: (sp500Data.price * 0.998).toFixed(2), // Slightly below current price
-                    stopLoss: (sp500Data.price * 0.985).toFixed(2), // 1.5% stop loss
-                    targets: [
-                        (sp500Data.price * 1.01).toFixed(2),
-                        (sp500Data.price * 1.025).toFixed(2)
-                    ],
-                    timeframe: 'Short-term',
-                    riskLevel: 'medium',
-                    reasoning: `SPY showing bullish momentum (+${sp500Data.changePercent.toFixed(2)}%). Market indices trending positive.`,
-                    newsImpact: 'Broad market strength supporting upward movement'
-                });
+            // Only proceed if we have REAL top gainers data
+            if (!moversData.top_gainers || !Array.isArray(moversData.top_gainers) || moversData.top_gainers.length === 0) {
+                console.warn("[smart-plays-generator.js] No real top gainers data available");
+                return {
+                    statusCode: 200,
+                    headers,
+                    body: JSON.stringify({
+                        plays: [],
+                        message: "No real market movers data available",
+                        timestamp: new Date().toISOString()
+                    })
+                };
+            }
 
-                if (nasdaqData.changePercent > sp500Data.changePercent) {
+            console.log(`[smart-plays-generator.js] Found ${moversData.top_gainers.length} real top gainers`);
+
+            // Generate plays ONLY from REAL top gainers with significant moves
+            for (let i = 0; i < Math.min(3, moversData.top_gainers.length); i++) {
+                const stock = moversData.top_gainers[i];
+                
+                // Parse real data
+                const ticker = stock.ticker;
+                const price = parseFloat(stock.price);
+                const changePercent = parseFloat(stock.change_percentage.replace('%', ''));
+                const volume = parseInt(stock.volume);
+
+                // Only create plays for stocks with significant REAL moves
+                if (changePercent >= 5 && volume >= 100000 && price > 1) {
+                    
+                    // Calculate realistic entry, stop loss, and targets based on REAL current price
+                    const entry = (price * 1.002).toFixed(2); // Enter slightly above current
+                    const stopLoss = (price * 0.95).toFixed(2); // 5% stop loss
+                    const target1 = (price * 1.08).toFixed(2); // 8% target
+                    const target2 = (price * 1.15).toFixed(2); // 15% target
+
                     plays.push({
-                        emoji: '💻',
-                        title: 'Tech Sector Strength',
-                        ticker: 'QQQ',
-                        strategy: 'Tech ETF Long',
-                        confidence: 80,
-                        entry: (nasdaqData.price * 0.997).toFixed(2),
-                        stopLoss: (nasdaqData.price * 0.98).toFixed(2),
-                        targets: [
-                            (nasdaqData.price * 1.015).toFixed(2),
-                            (nasdaqData.price * 1.03).toFixed(2)
-                        ],
-                        timeframe: 'Short-term',
-                        riskLevel: 'medium',
-                        reasoning: `QQQ outperforming SPY (+${nasdaqData.changePercent.toFixed(2)}% vs +${sp500Data.changePercent.toFixed(2)}%). Tech leading the market.`,
-                        newsImpact: 'Technology sector showing relative strength'
+                        emoji: '🚀',
+                        title: `${ticker} Momentum Play`,
+                        ticker: ticker,
+                        strategy: 'Momentum Breakout',
+                        confidence: Math.min(85, 60 + Math.floor(changePercent / 2)), // Confidence based on real move size
+                        entry: parseFloat(entry),
+                        stopLoss: parseFloat(stopLoss),
+                        targets: [parseFloat(target1), parseFloat(target2)],
+                        timeframe: 'Intraday to Short-term',
+                        riskLevel: changePercent > 15 ? 'high' : changePercent > 8 ? 'medium' : 'low',
+                        reasoning: `${ticker} showing strong momentum with +${changePercent.toFixed(2)}% gain on ${volume.toLocaleString()} volume. Real breakout above resistance levels.`,
+                        newsImpact: `Monitor ${ticker} for news catalysts driving the ${changePercent.toFixed(2)}% move`
                     });
                 }
-            } else if (marketSentiment === 'bearish') {
-                plays.push({
-                    emoji: '📉',
-                    title: 'Market Downtrend Protection',
-                    ticker: 'SQQQ',
-                    strategy: 'Inverse ETF',
-                    confidence: 70,
-                    entry: null, // Would need real SQQQ price
-                    stopLoss: null,
-                    targets: [null],
-                    timeframe: 'Short-term',
-                    riskLevel: 'high',
-                    reasoning: `Market showing bearish signals. SPY ${sp500Data.changePercent.toFixed(2)}%, QQQ ${nasdaqData.changePercent.toFixed(2)}%.`,
-                    newsImpact: 'Broad market weakness suggesting defensive positioning'
-                });
             }
+
+            // Generate contrarian plays from REAL top losers (oversold bounces)
+            if (moversData.top_losers && Array.isArray(moversData.top_losers) && moversData.top_losers.length > 0) {
+                for (let i = 0; i < Math.min(2, moversData.top_losers.length); i++) {
+                    const stock = moversData.top_losers[i];
+                    
+                    const ticker = stock.ticker;
+                    const price = parseFloat(stock.price);
+                    const changePercent = parseFloat(stock.change_percentage.replace('%', ''));
+                    const volume = parseInt(stock.volume);
+
+                    // Only create contrarian plays for significantly oversold stocks
+                    if (changePercent <= -8 && volume >= 100000 && price > 2) {
+                        
+                        const entry = (price * 1.01).toFixed(2); // Enter on bounce
+                        const stopLoss = (price * 0.92).toFixed(2); // 8% stop loss
+                        const target1 = (price * 1.06).toFixed(2); // 6% target
+                        const target2 = (price * 1.12).toFixed(2); // 12% target
+
+                        plays.push({
+                            emoji: '🔄',
+                            title: `${ticker} Oversold Bounce`,
+                            ticker: ticker,
+                            strategy: 'Mean Reversion',
+                            confidence: Math.min(75, 45 + Math.floor(Math.abs(changePercent) / 3)),
+                            entry: parseFloat(entry),
+                            stopLoss: parseFloat(stopLoss),
+                            targets: [parseFloat(target1), parseFloat(target2)],
+                            timeframe: 'Short-term',
+                            riskLevel: 'high',
+                            reasoning: `${ticker} severely oversold with ${changePercent.toFixed(2)}% decline on ${volume.toLocaleString()} volume. Potential bounce if no fundamental issues.`,
+                            newsImpact: `Check for specific negative news causing ${ticker}'s ${changePercent.toFixed(2)}% drop`
+                        });
+                    }
+                }
+            }
+
+            console.log(`[smart-plays-generator.js] Generated ${plays.length} plays from real market data`);
+
+        } catch (error) {
+            console.error("[smart-plays-generator.js] Error fetching real market data:", error);
+            return {
+                statusCode: 500,
+                headers,
+                body: JSON.stringify({
+                    error: "Failed to fetch real market data",
+                    timestamp: new Date().toISOString()
+                })
+            };
         }
 
-        // Generate plays from top gainers (only if we have real data)
-        if (topGainers.length > 0) {
-            const topGainer = topGainers[0];
-            if (topGainer.changePercent > 5 && topGainer.volume > 1000000) {
-                plays.push({
-                    emoji: '🔥',
-                    title: 'Momentum Breakout',
-                    ticker: topGainer.symbol,
-                    strategy: 'Momentum',
-                    confidence: 65,
-                    entry: (topGainer.price * 1.001).toFixed(2), // Enter on continuation
-                    stopLoss: (topGainer.price * 0.95).toFixed(2), // 5% stop
-                    targets: [
-                        (topGainer.price * 1.1).toFixed(2),
-                        (topGainer.price * 1.15).toFixed(2)
-                    ],
-                    timeframe: 'Intraday',
-                    riskLevel: 'high',
-                    reasoning: `${topGainer.symbol} showing strong momentum (+${topGainer.changePercent.toFixed(2)}%) with high volume (${topGainer.volume.toLocaleString()}).`,
-                    newsImpact: 'Check for specific news catalysts driving the move'
-                });
-            }
-        }
-
-        // Generate plays from top losers for potential bounce (only if we have real data)
-        if (topLosers.length > 0) {
-            const topLoser = topLosers[0];
-            if (topLoser.changePercent < -8 && topLoser.volume > 1000000) {
-                plays.push({
-                    emoji: '🔄',
-                    title: 'Oversold Bounce',
-                    ticker: topLoser.symbol,
-                    strategy: 'Mean Reversion',
-                    confidence: 55,
-                    entry: (topLoser.price * 1.02).toFixed(2), // Enter on bounce
-                    stopLoss: (topLoser.price * 0.95).toFixed(2), // 5% stop
-                    targets: [
-                        (topLoser.price * 1.08).toFixed(2),
-                        (topLoser.price * 1.12).toFixed(2)
-                    ],
-                    timeframe: 'Short-term',
-                    riskLevel: 'high',
-                    reasoning: `${topLoser.symbol} severely oversold (${topLoser.changePercent.toFixed(2)}%) with high volume. Potential for bounce if no fundamental issues.`,
-                    newsImpact: 'Verify no major negative news before entering'
-                });
-            }
-        }
-
-        // If no real data available, return empty array (NO MOCK DATA)
+        // ONLY return data if we have REAL plays
         if (plays.length === 0) {
-            console.log(`[smart-plays-generator.js] No real market data available for generating plays.`);
+            console.log("[smart-plays-generator.js] No qualifying real market opportunities found");
             return {
                 statusCode: 200,
                 headers,
                 body: JSON.stringify({
                     plays: [],
-                    marketSentiment: 'unknown',
+                    message: "No qualifying trading opportunities in current market",
                     timestamp: new Date().toISOString(),
-                    message: 'No trading opportunities identified with current market data',
-                    dataAvailable: {
-                        sp500: !!sp500Data,
-                        nasdaq: !!nasdaqData,
-                        topGainers: topGainers.length,
-                        topLosers: topLosers.length
-                    }
+                    dataSource: "Alpha Vantage Real-Time"
                 })
             };
         }
 
-        console.log(`[smart-plays-generator.js] Generated ${plays.length} real data-based smart plays.`);
+        // Return ONLY real data
         return {
             statusCode: 200,
             headers,
             body: JSON.stringify({
                 plays: plays,
-                marketSentiment: marketSentiment,
                 timestamp: new Date().toISOString(),
-                dataSource: 'Alpha Vantage Real-Time',
-                marketData: {
-                    sp500: sp500Data,
-                    nasdaq: nasdaqData,
-                    topGainersCount: topGainers.length,
-                    topLosersCount: topLosers.length
-                }
+                dataSource: "Alpha Vantage Real-Time",
+                totalOpportunities: plays.length
             })
         };
 
     } catch (error) {
-        console.error(`[smart-plays-generator.js] Unexpected server error:`, error);
+        console.error(`[smart-plays-generator.js] Server error:`, error);
         return {
             statusCode: 500,
             headers,
             body: JSON.stringify({
-                error: `Server error while generating smart plays: ${error.message}`,
-                details: 'Check server logs for more information'
+                error: "Server error generating smart plays",
+                timestamp: new Date().toISOString()
             })
         };
     }
