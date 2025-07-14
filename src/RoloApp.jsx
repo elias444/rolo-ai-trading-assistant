@@ -19,10 +19,18 @@ const RoloApp = () => {
   ]);
   const [chatInput, setChatInput] = useState('');
   const smartPlaysIntervalRef = useRef(null);
+  const autoRefreshIntervalRef = useRef(null);
+  
+  // Editable popular stocks with local storage persistence
+  const [popularStocks, setPopularStocks] = useState(() => {
+    const saved = localStorage.getItem('popularStocks');
+    return saved ? JSON.parse(saved) : ['AAPL', 'TSLA', 'NVDA', 'SPY', 'QQQ', 'META', 'AMD', 'GOOGL', 'MSFT'];
+  });
+  const [isEditingStocks, setIsEditingStocks] = useState(false);
+  const [editingSymbol, setEditingSymbol] = useState('');
+  const [editingIndex, setEditingIndex] = useState(null);
 
-  const popularStocks = ['AAPL', 'TSLA', 'NVDA', 'SPY', 'QQQ', 'META', 'AMD', 'GOOGL', 'MSFT'];
-
-  // Styles (your original, added flexWrap and overflow to technicalGrid for mobile fix)
+  // Styles
   const styles = {
     app: {
       minHeight: '100vh',
@@ -326,6 +334,129 @@ const RoloApp = () => {
     },
   };
 
+  // Check market status with more detailed sessions
+  useEffect(() => {
+    const checkMarketStatus = () => {
+      const now = new Date();
+      const easternTime = new Date(now.toLocaleString("en-US", {timeZone: "America/New_York"}));
+      const hours = easternTime.getHours();
+      const minutes = easternTime.getMinutes();
+      const day = easternTime.getDay();
+      const time = hours + (minutes / 60);
+      
+      // Check if it's a weekday
+      if (day >= 1 && day <= 5) {
+        if (time >= 4 && time < 9.5) {
+          setMarketStatus('Pre-Market');
+        } else if (time >= 9.5 && time < 16) {
+          setMarketStatus('Market Open');
+        } else if (time >= 16 && time < 20) {
+          setMarketStatus('After Hours');
+        } else if (time >= 20 || time < 4) {
+          setMarketStatus('Futures Open');
+        }
+      } else {
+        // Weekend - but check for Sunday futures
+        if (day === 0 && hours >= 18) {
+          setMarketStatus('Futures Open');
+        } else if (day === 5 && hours >= 16) {
+          setMarketStatus('After Hours');
+        } else {
+          setMarketStatus('Weekend');
+        }
+      }
+    };
+    
+    checkMarketStatus();
+    const interval = setInterval(checkMarketStatus, 30000); // Check every 30 seconds
+    return () => clearInterval(interval);
+  }, []);
+
+  // Save popular stocks to localStorage when changed
+  useEffect(() => {
+    localStorage.setItem('popularStocks', JSON.stringify(popularStocks));
+  }, [popularStocks]);
+
+  // Auto-refresh stock data based on market session
+  useEffect(() => {
+    const refreshInterval = marketStatus === 'Market Open' ? 60000 : // 1 minute during market hours
+                          marketStatus === 'Pre-Market' || marketStatus === 'After Hours' ? 120000 : // 2 minutes
+                          300000; // 5 minutes otherwise
+    
+    // Clear existing interval
+    if (autoRefreshIntervalRef.current) {
+      clearInterval(autoRefreshIntervalRef.current);
+    }
+    
+    // Set up new interval
+    autoRefreshIntervalRef.current = setInterval(() => {
+      // Refresh all popular stocks
+      popularStocks.forEach(symbol => {
+        fetchStockData(symbol);
+      });
+      // Refresh selected stock
+      if (selectedStock) {
+        fetchStockData(selectedStock);
+      }
+    }, refreshInterval);
+    
+    return () => {
+      if (autoRefreshIntervalRef.current) {
+        clearInterval(autoRefreshIntervalRef.current);
+      }
+    };
+  }, [marketStatus, popularStocks, selectedStock]);
+
+  // Fetch stock data
+  const fetchStockData = async (symbol) => {
+    setIsLoading(true);
+    try {
+      const response = await fetch(`/.netlify/functions/enhanced-stock-data?symbol=${symbol}`);
+      const data = await response.json();
+      if (response.ok) {
+        setStockData(prev => ({ ...prev, [symbol]: data }));
+      }
+    } catch (error) {
+      console.error('Error fetching stock data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleEditStock = (index) => {
+    setEditingIndex(index);
+    setEditingSymbol(popularStocks[index]);
+    setIsEditingStocks(true);
+  };
+
+  const handleSaveStock = () => {
+    if (editingSymbol && editingIndex !== null) {
+      const newStocks = [...popularStocks];
+      newStocks[editingIndex] = editingSymbol.toUpperCase();
+      setPopularStocks(newStocks);
+      // Fetch data for the new stock
+      fetchStockData(editingSymbol.toUpperCase());
+    }
+    setIsEditingStocks(false);
+    setEditingIndex(null);
+    setEditingSymbol('');
+  };
+
+  const handleAddStock = () => {
+    if (popularStocks.length < 12) { // Limit to 12 stocks
+      const newStocks = [...popularStocks, 'NEW'];
+      setPopularStocks(newStocks);
+      handleEditStock(newStocks.length - 1);
+    }
+  };
+
+  const handleRemoveStock = (index) => {
+    if (popularStocks.length > 3) { // Keep at least 3 stocks
+      const newStocks = popularStocks.filter((_, i) => i !== index);
+      setPopularStocks(newStocks);
+    }
+  };
+
   // Add keyframes for animations
   useEffect(() => {
     const style = document.createElement('style');
@@ -345,47 +476,6 @@ const RoloApp = () => {
     document.head.appendChild(style);
     return () => document.head.removeChild(style);
   }, []);
-
-  // Check market status
-  useEffect(() => {
-    const checkMarketStatus = () => {
-      const now = new Date();
-      const hours = now.getUTCHours() - 5; // EST
-      const day = now.getDay();
-      
-      if (day === 0 || day === 6) {
-        setMarketStatus('Weekend');
-      } else if (hours >= 4 && hours < 9.5) {
-        setMarketStatus('Pre-Market');
-      } else if (hours >= 9.5 && hours < 16) {
-        setMarketStatus('Market Open');
-      } else if (hours >= 16 && hours < 20) {
-        setMarketStatus('After Hours');
-      } else {
-        setMarketStatus('Market Closed');
-      }
-    };
-    
-    checkMarketStatus();
-    const interval = setInterval(checkMarketStatus, 60000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Fetch stock data
-  const fetchStockData = async (symbol) => {
-    setIsLoading(true);
-    try {
-      const response = await fetch(`/.netlify/functions/enhanced-stock-data?symbol=${symbol}`);
-      const data = await response.json();
-      if (response.ok) {
-        setStockData(prev => ({ ...prev, [symbol]: data }));
-      }
-    } catch (error) {
-      console.error('Error fetching stock data:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   // Fetch AI Analysis
   const fetchAIAnalysis = async (symbol) => {
@@ -492,15 +582,19 @@ const RoloApp = () => {
 
   // Setup smart plays interval during market hours
   useEffect(() => {
-    if (marketStatus === 'Market Open') {
+    if (marketStatus === 'Market Open' || marketStatus === 'Pre-Market' || marketStatus === 'After Hours') {
       // Fetch immediately
       fetchSmartPlays();
       
-      // Then fetch every hour
+      // Then fetch every hour during market hours, every 2 hours otherwise
+      const interval = marketStatus === 'Market Open' ? 3600000 : 7200000;
       smartPlaysIntervalRef.current = setInterval(() => {
         fetchSmartPlays();
-      }, 3600000); // 1 hour
+      }, interval);
     } else {
+      // Fetch once for closed market
+      fetchSmartPlays();
+      
       // Clear interval when market is closed
       if (smartPlaysIntervalRef.current) {
         clearInterval(smartPlaysIntervalRef.current);
@@ -519,6 +613,7 @@ const RoloApp = () => {
     if (selectedStock) {
       fetchStockData(selectedStock);
       if (activeTab === 'analysis') {
+        // Always fetch fresh analysis data when tab is selected
         fetchAIAnalysis(selectedStock);
         fetchTechnicalIndicators(selectedStock);
         fetchNewsData(selectedStock);
@@ -538,6 +633,12 @@ const RoloApp = () => {
     if (activeTab === 'market') {
       fetchMarketDashboard();
       fetchEconomicIndicators();
+      // Add refresh interval for market data
+      const marketInterval = setInterval(() => {
+        fetchMarketDashboard();
+        fetchEconomicIndicators();
+      }, 120000); // Refresh every 2 minutes
+      return () => clearInterval(marketInterval);
     } else if (activeTab === 'alerts') {
       fetchAlerts();
       // Refresh alerts every 30 seconds
@@ -545,8 +646,14 @@ const RoloApp = () => {
       return () => clearInterval(interval);
     } else if (activeTab === 'plays') {
       fetchSmartPlays();
+    } else if (activeTab === 'analysis' && selectedStock) {
+      // Ensure analysis data is loaded
+      if (!analysisData || analysisData.symbol !== selectedStock) {
+        fetchAIAnalysis(selectedStock);
+        fetchTechnicalIndicators(selectedStock);
+      }
     }
-  }, [activeTab]);
+  }, [activeTab, selectedStock]);
 
   const handleSearch = () => {
     if (searchTicker) {
@@ -590,7 +697,7 @@ const RoloApp = () => {
     const baseStyle = { ...styles.marketStatusBadge };
     if (marketStatus === 'Market Open') {
       return { ...baseStyle, backgroundColor: '#064E3B', color: '#10B981' };
-    } else if (marketStatus === 'Pre-Market' || marketStatus === 'After Hours') {
+    } else if (marketStatus === 'Pre-Market' || marketStatus === 'After Hours' || marketStatus === 'Futures Open') {
       return { ...baseStyle, backgroundColor: '#7C2D12', color: '#F59E0B' };
     }
     return { ...baseStyle, backgroundColor: '#1F2937', color: '#9CA3AF' };
@@ -600,7 +707,7 @@ const RoloApp = () => {
     const baseStyle = { ...styles.marketStatusDot };
     if (marketStatus === 'Market Open') {
       return { ...baseStyle, backgroundColor: '#10B981' };
-    } else if (marketStatus === 'Pre-Market' || marketStatus === 'After Hours') {
+    } else if (marketStatus === 'Pre-Market' || marketStatus === 'After Hours' || marketStatus === 'Futures Open') {
       return { ...baseStyle, backgroundColor: '#F59E0B' };
     }
     return { ...baseStyle, backgroundColor: '#9CA3AF' };
@@ -619,10 +726,8 @@ const RoloApp = () => {
     <div style={styles.app}>
       {/* Header */}
       <div style={styles.header}>
-        <h1 style={styles.title}>Rolo</h1>
-        <p style={styles.subtitle}>
-          AI Trading Assistant
-        </p>
+        <h1 style={styles.title}>Rolo AI</h1>
+        <p style={styles.subtitle}>Professional Trading Assistant</p>
         <div style={styles.marketStatus}>
           <span style={getMarketStatusStyle()}>
             <span style={getMarketStatusDotStyle()}></span>
@@ -662,28 +767,97 @@ const RoloApp = () => {
               <div style={styles.stocksSection}>
                 <h2 style={styles.sectionTitle}>
                   <span style={{ marginRight: '8px' }}>📈</span> Popular Stocks
+                  <button
+                    onClick={() => setIsEditingStocks(!isEditingStocks)}
+                    style={{
+                      marginLeft: 'auto',
+                      backgroundColor: 'transparent',
+                      border: '1px solid #3B82F6',
+                      color: '#3B82F6',
+                      borderRadius: '8px',
+                      padding: '4px 12px',
+                      fontSize: '14px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {isEditingStocks ? 'Done' : 'Edit'}
+                  </button>
                 </h2>
                 <div style={styles.stockGrid}>
-                  {popularStocks.map(symbol => {
+                  {popularStocks.map((symbol, index) => {
                     const data = stockData[symbol];
+                    const isEditing = isEditingStocks && editingIndex === index;
+                    
                     return (
                       <div
-                        key={symbol}
-                        onClick={() => setSelectedStock(symbol)}
-                        style={selectedStock === symbol ? styles.stockCardActive : styles.stockCard}
+                        key={index}
+                        onClick={() => !isEditingStocks && setSelectedStock(symbol)}
+                        style={{
+                          ...((selectedStock === symbol && !isEditingStocks) ? styles.stockCardActive : styles.stockCard),
+                          position: 'relative'
+                        }}
                         onMouseOver={(e) => {
-                          if (selectedStock !== symbol) {
+                          if (selectedStock !== symbol && !isEditingStocks) {
                             e.currentTarget.style.borderColor = '#4B5563';
                           }
                         }}
                         onMouseOut={(e) => {
-                          if (selectedStock !== symbol) {
+                          if (selectedStock !== symbol && !isEditingStocks) {
                             e.currentTarget.style.borderColor = '#374151';
                           }
                         }}
                       >
-                        <div style={styles.stockSymbol}>{symbol}</div>
-                        {data && (
+                        {isEditingStocks && (
+                          <button
+                            onClick={() => handleRemoveStock(index)}
+                            style={{
+                              position: 'absolute',
+                              top: '-8px',
+                              right: '-8px',
+                              backgroundColor: '#EF4444',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '50%',
+                              width: '20px',
+                              height: '20px',
+                              cursor: 'pointer',
+                              fontSize: '12px',
+                              lineHeight: '1'
+                            }}
+                          >
+                            ×
+                          </button>
+                        )}
+                        
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={editingSymbol}
+                            onChange={(e) => setEditingSymbol(e.target.value.toUpperCase())}
+                            onBlur={handleSaveStock}
+                            onKeyPress={(e) => e.key === 'Enter' && handleSaveStock()}
+                            style={{
+                              backgroundColor: 'transparent',
+                              border: 'none',
+                              color: 'white',
+                              textAlign: 'center',
+                              fontSize: '14px',
+                              fontWeight: 'bold',
+                              width: '100%',
+                              outline: 'none'
+                            }}
+                            autoFocus
+                          />
+                        ) : (
+                          <div 
+                            onClick={() => isEditingStocks && handleEditStock(index)}
+                            style={{ cursor: isEditingStocks ? 'pointer' : 'default' }}
+                          >
+                            <div style={styles.stockSymbol}>{symbol}</div>
+                          </div>
+                        )}
+                        
+                        {data && !isEditing && (
                           <>
                             <div style={styles.stockPrice}>${data.price}</div>
                             <div style={{
@@ -692,11 +866,38 @@ const RoloApp = () => {
                             }}>
                               {data.changePercent}
                             </div>
+                            <div style={{
+                              fontSize: '10px',
+                              color: '#6B7280',
+                              marginTop: '4px'
+                            }}>
+                              {data.sessionLabel}
+                            </div>
                           </>
                         )}
                       </div>
                     );
                   })}
+                  
+                  {isEditingStocks && popularStocks.length < 12 && (
+                    <div
+                      onClick={handleAddStock}
+                      style={{
+                        ...styles.stockCard,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderStyle: 'dashed'
+                      }}
+                    >
+                      <span style={{ fontSize: '24px' }}>+</span>
+                    </div>
+                  )}
+                </div>
+                
+                <div style={{ marginTop: '12px', fontSize: '12px', color: '#6B7280', textAlign: 'center' }}>
+                  Prices update every {marketStatus === 'Market Open' ? '1-2' : '2-5'} minutes
                 </div>
               </div>
 
@@ -706,7 +907,7 @@ const RoloApp = () => {
                   <div style={styles.stockDetailsHeader}>
                     <div>
                       <h2 style={styles.stockDetailsTitle}>{selectedStock}</h2>
-                      <p style={styles.stockDetailsStatus}>{marketStatus}</p>
+                      <p style={styles.stockDetailsStatus}>{stockData[selectedStock].sessionLabel || marketStatus}</p>
                     </div>
                     <div style={styles.stockDetailsPrice}>
                       <div style={styles.stockDetailsPriceValue}>
@@ -739,6 +940,10 @@ const RoloApp = () => {
                       <p style={styles.metricValue}>${stockData[selectedStock].open}</p>
                     </div>
                   </div>
+                  
+                  <div style={{ marginTop: '12px', fontSize: '12px', color: '#6B7280', textAlign: 'center' }}>
+                    Last updated: {new Date(stockData[selectedStock].dataTimestamp || Date.now()).toLocaleTimeString()}
+                  </div>
                 </div>
               )}
             </div>
@@ -762,6 +967,32 @@ const RoloApp = () => {
             {isLoading && (
               <div style={styles.loadingSpinner}>
                 <p>🔄 Analyzing {selectedStock} with AI...</p>
+              </div>
+            )}
+
+            {!isLoading && (!analysisData || analysisData.symbol !== selectedStock) && (
+              <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+                <p style={{ color: '#9CA3AF', marginBottom: '20px' }}>
+                  Click below to generate AI-powered analysis
+                </p>
+                <button
+                  onClick={() => {
+                    fetchAIAnalysis(selectedStock);
+                    fetchTechnicalIndicators(selectedStock);
+                  }}
+                  style={{
+                    backgroundColor: '#3B82F6',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '12px',
+                    padding: '12px 24px',
+                    fontSize: '16px',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Generate Analysis
+                </button>
               </div>
             )}
 
@@ -902,13 +1133,23 @@ const RoloApp = () => {
             {technicalData && (
               <div style={styles.analysisCard}>
                 <h3 style={{ margin: '0 0 12px 0', color: '#3B82F6' }}>Technical Indicators</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
-                  {Object.entries(technicalData.indicators).map(([key, value]) => (
-                    <div key={key}>
-                      <p style={styles.metricLabel}>{key.toUpperCase()}</p>
-                      <p style={{ margin: '0', fontWeight: 'bold' }}>
-                        {typeof value === 'object' ? JSON.stringify(value.value || value) : value}
-                      </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {technicalData.indicators && Object.entries(technicalData.indicators).map(([key, value]) => (
+                    <div key={key} style={{ borderBottom: '1px solid #374151', paddingBottom: '8px' }}>
+                      <p style={{ ...styles.metricLabel, margin: '0 0 4px 0' }}>{key.toUpperCase()}</p>
+                      <div style={{ fontSize: '14px', color: '#ffffff', wordBreak: 'break-word' }}>
+                        {typeof value === 'object' ? (
+                          <div style={{ fontSize: '12px' }}>
+                            {Object.entries(value).map(([k, v]) => (
+                              <div key={k} style={{ marginBottom: '2px' }}>
+                                <span style={{ color: '#9CA3AF' }}>{k}:</span> {v}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <span style={{ fontWeight: 'bold' }}>{value}</span>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -953,80 +1194,452 @@ const RoloApp = () => {
         )}
 
         {activeTab === 'plays' && (
-          <div style={styles.smartPlaysSection}>
-            <h2 style={styles.sectionTitle}>Smart Plays</h2>
-            {smartPlays.map((play, index) => (
-              <div key={index} style={styles.smartPlayCard}>
-                <h3 style={styles.smartPlayTitle}>{play.stock}: {play.strategy}</h3>
-                <p style={styles.smartPlayContent}>
-                  Entry: {play.entry}, Target: {play.target}, Stop: {play.stop}
+          <div style={{ padding: '20px' }}>
+            <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '8px' }}>Smart Plays</h2>
+            <p style={{ color: '#9CA3AF', marginBottom: '16px', fontSize: '14px' }}>
+              AI-generated trading opportunities • Updated {marketStatus === 'Market Open' ? 'hourly' : marketStatus.includes('Market') ? 'every 2 hours' : 'at market open'}
+            </p>
+            
+            <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: '#1a1a1a', borderRadius: '12px' }}>
+              <p style={{ fontSize: '12px', color: '#6B7280', margin: 0 }}>
+                🤖 AI analyzes: Real-time prices • News sentiment • Technical indicators • Market momentum • Volume patterns
+              </p>
+            </div>
+            
+            {smartPlays.length === 0 && (
+              <div style={styles.loadingSpinner}>
+                <p>🤖 Analyzing markets with AI to find opportunities...</p>
+                <p style={{ fontSize: '12px', color: '#6B7280', marginTop: '8px' }}>This may take a moment</p>
+              </div>
+            )}
+
+            {smartPlays.map((play, idx) => (
+              <div key={idx} style={getPlayCardStyle(play.confidence)} className="animate-slide-in">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <h3 style={{ fontSize: '18px', fontWeight: '600', margin: 0, color: '#ffffff' }}>
+                    {play.emoji} {play.title}
+                  </h3>
+                  <span style={{
+                    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                    padding: '4px 12px',
+                    borderRadius: '12px',
+                    fontSize: '12px',
+                    color: '#ffffff'
+                  }}>
+                    {play.confidence}% Confidence
+                  </span>
+                </div>
+                
+                <div style={{ marginBottom: '12px' }}>
+                  <p style={{ margin: '0 0 4px 0', fontSize: '20px', fontWeight: 'bold', color: '#ffffff' }}>
+                    {play.ticker}
+                  </p>
+                  <p style={{ margin: '0', fontSize: '14px', color: '#E5E7EB' }}>
+                    Strategy: {play.strategy} • {play.timeframe}
+                  </p>
+                </div>
+
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(3, 1fr)', 
+                  gap: '12px',
+                  marginBottom: '12px',
+                  backgroundColor: 'rgba(0, 0, 0, 0.3)',
+                  padding: '12px',
+                  borderRadius: '8px'
+                }}>
+                  <div>
+                    <p style={{ margin: '0', fontSize: '12px', color: '#9CA3AF' }}>Entry</p>
+                    <p style={{ margin: '0', fontWeight: 'bold', color: '#10B981' }}>${play.entry}</p>
+                  </div>
+                  <div>
+                    <p style={{ margin: '0', fontSize: '12px', color: '#9CA3AF' }}>Stop Loss</p>
+                    <p style={{ margin: '0', fontWeight: 'bold', color: '#EF4444' }}>${play.stopLoss}</p>
+                  </div>
+                  <div>
+                    <p style={{ margin: '0', fontSize: '12px', color: '#9CA3AF' }}>Target</p>
+                    <p style={{ margin: '0', fontWeight: 'bold', color: '#10B981' }}>
+                      ${play.targets?.[0]} {play.targets?.[1] && `/ $${play.targets[1]}`}
+                    </p>
+                  </div>
+                </div>
+
+                <p style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#E5E7EB' }}>
+                  {play.reasoning}
                 </p>
+                
+                {play.newsImpact && (
+                  <p style={{ margin: '0', fontSize: '12px', color: '#F59E0B' }}>
+                    📰 {play.newsImpact}
+                  </p>
+                )}
+                
+                <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{
+                    fontSize: '12px',
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    backgroundColor: play.riskLevel === 'high' ? 'rgba(239, 68, 68, 0.2)' :
+                                    play.riskLevel === 'medium' ? 'rgba(245, 158, 11, 0.2)' :
+                                    'rgba(16, 185, 129, 0.2)',
+                    color: play.riskLevel === 'high' ? '#EF4444' :
+                           play.riskLevel === 'medium' ? '#F59E0B' : '#10B981'
+                  }}>
+                    {play.riskLevel?.toUpperCase()} RISK
+                  </span>
+                  <span style={{ fontSize: '10px', color: '#6B7280' }}>
+                    Generated: {new Date().toLocaleTimeString()}
+                  </span>
+                </div>
               </div>
             ))}
+            
+            {smartPlays.length > 0 && (
+              <div style={{ marginTop: '16px', fontSize: '12px', color: '#6B7280', textAlign: 'center' }}>
+                Based on real-time market data • Not financial advice
+              </div>
+            )}
           </div>
         )}
 
         {activeTab === 'market' && (
-          <div style={styles.marketSection}>
-            <h2 style={styles.sectionTitle}>Market Overview</h2>
-            <div style={styles.marketGrid}>
-              <div style={styles.marketCard}>
-                <h3 style={styles.marketTitle}>Dow</h3>
-                <p style={styles.marketValue}>{marketData.dow || 'N/A'}</p>
-                <p style={styles.marketChange}>{marketData.dowChange || ''}</p>
-              </div>
-              <div style={styles.marketCard}>
-                <h3 style={styles.marketTitle}>Nasdaq</h3>
-                <p style={styles.marketValue}>{marketData.nasdaq || 'N/A'}</p>
-                <p style={styles.marketChange}>{marketData.nasdaqChange || ''}</p>
-              </div>
-              <div style={styles.marketCard}>
-                <h3 style={styles.marketTitle}>Futures</h3>
-                <p style={styles.marketValue}>{marketData.futures || 'N/A'}</p>
-                <p style={styles.marketChange}>{marketData.futuresChange || ''}</p>
-              </div>
-              <div style={styles.marketCard}>
-                <h3 style={styles.marketTitle}>10-Year Treasury</h3>
-                <p style={styles.marketValue}>{marketData.treasury10yr || 'N/A'}</p>
-                <p style={styles.marketChange}>{marketData.treasury10yrChange || ''}</p>
+          <div style={{ padding: '20px' }}>
+            <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px' }}>Market Overview</h2>
+            
+            {/* Market Status Badge */}
+            <div style={{ marginBottom: '16px', textAlign: 'center' }}>
+              <span style={{
+                ...getMarketStatusStyle(),
+                fontSize: '14px',
+                padding: '8px 16px'
+              }}>
+                <span style={getMarketStatusDotStyle()}></span>
+                {marketStatus}
+              </span>
+            </div>
+            
+            {/* Major Indices */}
+            <div style={{ marginBottom: '24px' }}>
+              <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '12px' }}>Major Indices</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {marketData.sp500 && (
+                  <div style={{
+                    ...styles.stockDetails,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                    <div>
+                      <p style={{ fontWeight: '600', margin: '0' }}>{marketData.sp500.symbol}</p>
+                      <p style={{ fontSize: '12px', color: '#6B7280', margin: '2px 0 0 0' }}>
+                        {marketStatus.includes('Futures') ? 'Futures' : 'Live'}
+                      </p>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <p style={{ fontSize: '18px', fontWeight: 'bold', margin: '0' }}>${marketData.sp500.price}</p>
+                      <p style={{ 
+                        fontSize: '14px', 
+                        color: parseFloat(marketData.sp500.change) >= 0 ? '#10B981' : '#EF4444',
+                        margin: '4px 0 0 0' 
+                      }}>
+                        {marketData.sp500.change} ({marketData.sp500.changePercent})
+                      </p>
+                    </div>
+                  </div>
+                )}
+                
+                {marketData.nasdaq && (
+                  <div style={{
+                    ...styles.stockDetails,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                    <div>
+                      <p style={{ fontWeight: '600', margin: '0' }}>{marketData.nasdaq.symbol}</p>
+                      <p style={{ fontSize: '12px', color: '#6B7280', margin: '2px 0 0 0' }}>
+                        {marketStatus.includes('Futures') ? 'Futures' : 'Live'}
+                      </p>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <p style={{ fontSize: '18px', fontWeight: 'bold', margin: '0' }}>${marketData.nasdaq.price}</p>
+                      <p style={{ 
+                        fontSize: '14px', 
+                        color: parseFloat(marketData.nasdaq.change) >= 0 ? '#10B981' : '#EF4444',
+                        margin: '4px 0 0 0' 
+                      }}>
+                        {marketData.nasdaq.change} ({marketData.nasdaq.changePercent})
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {marketData.dowJones && (
+                  <div style={{
+                    ...styles.stockDetails,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                    <div>
+                      <p style={{ fontWeight: '600', margin: '0' }}>{marketData.dowJones.symbol}</p>
+                      <p style={{ fontSize: '12px', color: '#6B7280', margin: '2px 0 0 0' }}>
+                        {marketStatus.includes('Futures') ? 'Futures' : 'Live'}
+                      </p>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <p style={{ fontSize: '18px', fontWeight: 'bold', margin: '0' }}>${marketData.dowJones.price}</p>
+                      <p style={{ 
+                        fontSize: '14px', 
+                        color: parseFloat(marketData.dowJones.change) >= 0 ? '#10B981' : '#EF4444',
+                        margin: '4px 0 0 0' 
+                      }}>
+                        {marketData.dowJones.change} ({marketData.dowJones.changePercent})
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
+
+            {/* Economic Indicators */}
+            {economicData && (
+              <div style={{ marginBottom: '24px' }}>
+                <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '12px' }}>Key Economic Indicators</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+                  {economicData.indicators?.treasury10Year && (
+                    <div style={styles.metricCard}>
+                      <p style={styles.metricLabel}>10-Year Treasury</p>
+                      <p style={styles.metricValue}>
+                        {economicData.indicators.treasury10Year.value}%
+                      </p>
+                      <p style={{ fontSize: '10px', color: '#6B7280', margin: '4px 0 0 0' }}>
+                        {economicData.indicators.treasury10Year.date}
+                      </p>
+                    </div>
+                  )}
+                  {economicData.indicators?.federalFundsRate && (
+                    <div style={styles.metricCard}>
+                      <p style={styles.metricLabel}>Fed Funds Rate</p>
+                      <p style={styles.metricValue}>
+                        {economicData.indicators.federalFundsRate.value}%
+                      </p>
+                      <p style={{ fontSize: '10px', color: '#6B7280', margin: '4px 0 0 0' }}>
+                        {economicData.indicators.federalFundsRate.date}
+                      </p>
+                    </div>
+                  )}
+                  {economicData.indicators?.cpi && (
+                    <div style={styles.metricCard}>
+                      <p style={styles.metricLabel}>CPI</p>
+                      <p style={styles.metricValue}>
+                        {economicData.indicators.cpi.value}
+                      </p>
+                      <p style={{ fontSize: '10px', color: '#6B7280', margin: '4px 0 0 0' }}>
+                        {economicData.indicators.cpi.date}
+                      </p>
+                    </div>
+                  )}
+                  {economicData.indicators?.unemploymentRate && (
+                    <div style={styles.metricCard}>
+                      <p style={styles.metricLabel}>Unemployment</p>
+                      <p style={styles.metricValue}>
+                        {economicData.indicators.unemploymentRate.value}%
+                      </p>
+                      <p style={{ fontSize: '10px', color: '#6B7280', margin: '4px 0 0 0' }}>
+                        {economicData.indicators.unemploymentRate.date}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Commodities & Crypto */}
+            {economicData && (economicData.commodities || economicData.crypto) && (
+              <div>
+                <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '12px' }}>Commodities & Crypto</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+                  {economicData.commodities?.wtiCrude && (
+                    <div style={styles.metricCard}>
+                      <p style={styles.metricLabel}>WTI Crude Oil</p>
+                      <p style={styles.metricValue}>${economicData.commodities.wtiCrude.value}</p>
+                      <p style={{ fontSize: '10px', color: '#6B7280', margin: '4px 0 0 0' }}>
+                        per barrel
+                      </p>
+                    </div>
+                  )}
+                  {economicData.commodities?.naturalGas && (
+                    <div style={styles.metricCard}>
+                      <p style={styles.metricLabel}>Natural Gas</p>
+                      <p style={styles.metricValue}>${economicData.commodities.naturalGas.value}</p>
+                      <p style={{ fontSize: '10px', color: '#6B7280', margin: '4px 0 0 0' }}>
+                        per MMBtu
+                      </p>
+                    </div>
+                  )}
+                  {economicData.crypto?.bitcoin && (
+                    <div style={styles.metricCard}>
+                      <p style={styles.metricLabel}>Bitcoin</p>
+                      <p style={styles.metricValue}>${economicData.crypto.bitcoin.value.toLocaleString()}</p>
+                      <p style={{ fontSize: '10px', color: '#6B7280', margin: '4px 0 0 0' }}>
+                        BTC/USD
+                      </p>
+                    </div>
+                  )}
+                  {economicData.indicators?.dollarIndex && (
+                    <div style={styles.metricCard}>
+                      <p style={styles.metricLabel}>Dollar Index</p>
+                      <p style={styles.metricValue}>{economicData.indicators.dollarIndex.value}</p>
+                      <p style={{ fontSize: '10px', color: '#6B7280', margin: '4px 0 0 0' }}>
+                        DXY
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
         {activeTab === 'alerts' && (
-          <div style={styles.alertsSection}>
-            <h2 style={styles.sectionTitle}>Alerts</h2>
-            {alerts.map((alert, index) => (
-              <div key={index} style={styles.alertCard}>
-                <h3 style={styles.alertTitle}>{alert.title}</h3>
-                <p style={styles.alertContent}>{alert.message}</p>
+          <div style={{ padding: '20px' }}>
+            <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '8px' }}>Real-time Alerts</h2>
+            <p style={{ color: '#9CA3AF', marginBottom: '16px', fontSize: '14px' }}>
+              Market movements, volume spikes, and trading opportunities
+            </p>
+            
+            <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: '#1a1a1a', borderRadius: '12px' }}>
+              <p style={{ fontSize: '12px', color: '#6B7280', margin: 0 }}>
+                📊 Alerts monitor: Price movements &gt;3% • Volume spikes &gt;2x avg • Volatility changes • News sentiment shifts
+              </p>
+            </div>
+            
+            {alerts.length === 0 && (
+              <div style={styles.loadingSpinner}>
+                <p>🔍 Scanning markets for unusual activity...</p>
               </div>
-            ))}
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {alerts.map((alert, idx) => (
+                <div 
+                  key={idx} 
+                  className="animate-slide-in"
+                  style={{
+                    backgroundColor: alert.priority === 'high' ? 'rgba(239, 68, 68, 0.1)' :
+                                    alert.priority === 'medium' ? 'rgba(245, 158, 11, 0.1)' :
+                                    'rgba(16, 185, 129, 0.1)',
+                    border: `1px solid ${alert.priority === 'high' ? '#EF4444' :
+                                         alert.priority === 'medium' ? '#F59E0B' : '#10B981'}`,
+                    borderRadius: '12px',
+                    padding: '16px'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'flex-start' }}>
+                    <span style={{ fontSize: '24px', marginRight: '12px' }}>
+                      {alert.type === 'price_movement' ? '📈' :
+                       alert.type === 'volume_spike' ? '📊' :
+                       alert.type === 'market_volatility' ? '🚨' :
+                       alert.type === 'market_calm' ? '🧘' : '🔔'}
+                    </span>
+                    <div style={{ flex: 1 }}>
+                      <h3 style={{ fontWeight: '600', margin: '0 0 4px 0' }}>{alert.title}</h3>
+                      <p style={{ fontSize: '14px', color: '#D1D5DB', margin: '0 0 8px 0' }}>
+                        {alert.description}
+                      </p>
+                      {alert.action && (
+                        <p style={{ fontSize: '12px', color: '#9CA3AF', margin: '0 0 4px 0' }}>
+                          💡 {alert.action}
+                        </p>
+                      )}
+                      <p style={{ fontSize: '12px', color: '#6B7280', margin: 0 }}>
+                        {new Date(alert.timestamp).toLocaleTimeString()}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            <div style={{ marginTop: '16px', fontSize: '12px', color: '#6B7280', textAlign: 'center' }}>
+              Auto-refreshes every 30 seconds • Based on real-time market data
+            </div>
           </div>
         )}
       </div>
 
-      <nav style={styles.nav}>
-        <div style={activeTab === 'ticker' ? styles.navItemActive : styles.navItem} onClick={() => changeTab('ticker')} onTouchStart={() => changeTab('ticker')}>
-          Ticker
+      {/* Bottom Navigation */}
+      <div style={styles.bottomNav}>
+        <div style={styles.navContainer}>
+          <button
+            onClick={() => setActiveTab('chat')}
+            style={activeTab === 'chat' ? styles.navButtonActive : styles.navButton}
+            onTouchStart={(e) => { e.currentTarget.style.opacity = '0.7'; }}
+            onTouchEnd={(e) => { e.currentTarget.style.opacity = '1'; }}
+          >
+            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
+            <span style={styles.navLabel}>CHAT</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('ticker')}
+            style={activeTab === 'ticker' ? styles.navButtonActive : styles.navButton}
+            onTouchStart={(e) => { e.currentTarget.style.opacity = '0.7'; }}
+            onTouchEnd={(e) => { e.currentTarget.style.opacity = '1'; }}
+          >
+            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            <span style={styles.navLabel}>TICKER</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('analysis')}
+            style={activeTab === 'analysis' ? styles.navButtonActive : styles.navButton}
+            onTouchStart={(e) => { e.currentTarget.style.opacity = '0.7'; }}
+            onTouchEnd={(e) => { e.currentTarget.style.opacity = '1'; }}
+          >
+            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+            </svg>
+            <span style={styles.navLabel}>ANALYSIS</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('plays')}
+            style={activeTab === 'plays' ? styles.navButtonActive : styles.navButton}
+            onTouchStart={(e) => { e.currentTarget.style.opacity = '0.7'; }}
+            onTouchEnd={(e) => { e.currentTarget.style.opacity = '1'; }}
+          >
+            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            <span style={styles.navLabel}>PLAYS</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('market')}
+            style={activeTab === 'market' ? styles.navButtonActive : styles.navButton}
+            onTouchStart={(e) => { e.currentTarget.style.opacity = '0.7'; }}
+            onTouchEnd={(e) => { e.currentTarget.style.opacity = '1'; }}
+          >
+            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span style={styles.navLabel}>MARKET</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('alerts')}
+            style={activeTab === 'alerts' ? styles.navButtonActive : styles.navButton}
+            onTouchStart={(e) => { e.currentTarget.style.opacity = '0.7'; }}
+            onTouchEnd={(e) => { e.currentTarget.style.opacity = '1'; }}
+          >
+            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+            </svg>
+            <span style={styles.navLabel}>ALERTS</span>
+          </button>
         </div>
-        <div style={activeTab === 'analysis' ? styles.navItemActive : styles.navItem} onClick={() => changeTab('analysis')} onTouchStart={() => changeTab('analysis')}>
-          Analysis
-        </div>
-        <div style={activeTab === 'smartplays' ? styles.navItemActive : styles.navItem} onClick={() => changeTab('smartplays')} onTouchStart={() => changeTab('smartplays')}>
-          Plays
-        </div>
-        <div style={activeTab === 'market' ? styles.navItemActive : styles.navItem} onClick={() => changeTab('market')} onTouchStart={() => changeTab('market')}>
-          Market
-        </div>
-        <div style={activeTab === 'alerts' ? styles.navItemActive : styles.navItem} onClick={() => changeTab('alerts')} onTouchStart={() => changeTab('alerts')}>
-          Alerts
-        </div>
-        <div style={activeTab === 'chat' ? styles.navItemActive : styles.navItem} onClick={() => changeTab('chat')} onTouchStart={() => changeTab('chat')}>
-          Chat
-        </div>
-      </nav>
+      </div>
     </div>
   );
 };
