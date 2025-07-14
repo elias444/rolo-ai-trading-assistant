@@ -1,5 +1,5 @@
 // netlify/functions/smart-plays-generator.js
-// Intelligent Smart Plays using comprehensive AI analysis
+// Updated to use comprehensive AI analysis - NO MOCK DATA
 
 exports.handler = async (event, context) => {
     const headers = {
@@ -14,64 +14,89 @@ exports.handler = async (event, context) => {
     }
 
     try {
-        console.log(`[smart-plays-generator.js] Generating intelligent smart plays with comprehensive analysis...`);
+        console.log(`[smart-plays-generator.js] Generating smart plays using comprehensive AI analysis...`);
 
-        // Call the comprehensive AI analysis function
-        const analysisResponse = await fetch(`${process.env.URL || 'http://localhost:8888'}/.netlify/functions/comprehensive-ai-analysis`, {
+        // Get the base URL for calling other functions
+        const baseUrl = process.env.URL || `https://${event.headers.host}`;
+        
+        // Call the comprehensive AI analysis function for smart plays
+        const analysisResponse = await fetch(`${baseUrl}/.netlify/functions/comprehensive-ai-analysis`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'User-Agent': 'Netlify-Function'
+            },
             body: JSON.stringify({ type: 'smartplays' })
         });
 
         if (!analysisResponse.ok) {
-            throw new Error(`Comprehensive analysis failed: ${analysisResponse.status}`);
+            throw new Error(`Comprehensive analysis failed: ${analysisResponse.status} - ${analysisResponse.statusText}`);
         }
 
         const analysisData = await analysisResponse.json();
         
-        if (analysisData.analysis && analysisData.analysis.plays) {
+        // Check if we got valid analysis data
+        if (analysisData.analysis && analysisData.analysis.plays && Array.isArray(analysisData.analysis.plays)) {
             const plays = analysisData.analysis.plays;
-            const marketCondition = analysisData.analysis.marketCondition;
-            const overallStrategy = analysisData.analysis.overallStrategy;
-            const marketInsights = analysisData.analysis.marketInsights;
             
-            console.log(`[smart-plays-generator.js] Generated ${plays.length} intelligent plays based on comprehensive analysis`);
+            // Filter out any plays that don't have real data backing
+            const validPlays = plays.filter(play => 
+                play.ticker && 
+                play.title && 
+                play.confidence && 
+                play.confidence >= 60 && // Minimum confidence threshold
+                (play.entry || play.entry === 0) &&
+                (play.stopLoss || play.stopLoss === 0)
+            );
+            
+            console.log(`[smart-plays-generator.js] Generated ${validPlays.length} valid smart plays from comprehensive analysis`);
             
             return {
                 statusCode: 200,
                 headers,
                 body: JSON.stringify({
-                    plays: plays,
-                    marketCondition: marketCondition,
-                    overallStrategy: overallStrategy,
-                    marketInsights: marketInsights,
+                    plays: validPlays,
+                    marketCondition: analysisData.analysis.marketCondition || 'Unknown',
+                    sessionContext: analysisData.analysis.sessionContext || 'Unknown',
+                    overallStrategy: analysisData.analysis.overallStrategy || 'No strategy available',
+                    marketInsights: analysisData.analysis.marketInsights || {},
                     timestamp: new Date().toISOString(),
-                    dataSource: "Comprehensive AI Analysis",
-                    dataQuality: analysisData.dataQuality
+                    dataSource: "Comprehensive AI Analysis - Real Data Only",
+                    dataQuality: analysisData.dataQuality || {}
                 })
             };
         } else {
-            // Fallback if AI analysis fails
+            // No valid plays found - return empty but informative response
+            console.log(`[smart-plays-generator.js] No valid plays generated - insufficient market opportunities`);
+            
             return {
                 statusCode: 200,
                 headers,
                 body: JSON.stringify({
                     plays: [],
-                    message: "AI analysis temporarily unavailable",
-                    timestamp: new Date().toISOString()
+                    message: "No qualifying trading opportunities found",
+                    reason: "Current market conditions do not present significant moves meeting our criteria",
+                    marketCondition: analysisData.analysis?.marketCondition || "Unknown",
+                    sessionContext: analysisData.analysis?.sessionContext || "Unknown",
+                    timestamp: new Date().toISOString(),
+                    dataSource: "Comprehensive AI Analysis - Real Data Only",
+                    dataQuality: analysisData.dataQuality || {}
                 })
             };
         }
 
     } catch (error) {
-        console.error(`[smart-plays-generator.js] Error:`, error);
+        console.error(`[smart-plays-generator.js] Error generating smart plays:`, error);
+        
         return {
             statusCode: 500,
             headers,
             body: JSON.stringify({
                 error: "Smart plays generation error",
                 details: error.message,
-                timestamp: new Date().toISOString()
+                plays: [], // Always return empty array instead of mock data
+                timestamp: new Date().toISOString(),
+                dataSource: "Error - No Data Available"
             })
         };
     }
