@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 
-import React, { useState, useEffect, useRef } from 'react';
-
 const RoloApp = () => {
   const [activeTab, setActiveTab] = useState('ticker');
   const [searchTicker, setSearchTicker] = useState('');
@@ -336,6 +334,40 @@ const RoloApp = () => {
     },
   };
 
+  // Check market status with more detailed sessions
+  useEffect(() => {
+    const checkMarketStatus = () => {
+      const now = new Date();
+      const hours = now.getUTCHours() - 5; // EST
+      const minutes = now.getMinutes();
+      const day = now.getDay();
+      const time = hours + (minutes / 60);
+      
+      if (day === 0 || day === 6) {
+        // Futures open Sunday 6 PM EST
+        if (day === 0 && hours >= 18) {
+          setMarketStatus('Futures Open');
+        } else {
+          setMarketStatus('Weekend');
+        }
+      } else if (time >= 4 && time < 9.5) {
+        setMarketStatus('Pre-Market');
+      } else if (time >= 9.5 && time < 16) {
+        setMarketStatus('Market Open');
+      } else if (time >= 16 && time < 20) {
+        setMarketStatus('After Hours');
+      } else if (hours >= 20 || hours < 4) {
+        setMarketStatus('Futures Open');
+      } else {
+        setMarketStatus('Market Closed');
+      }
+    };
+    
+    checkMarketStatus();
+    const interval = setInterval(checkMarketStatus, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
   // Save popular stocks to localStorage when changed
   useEffect(() => {
     localStorage.setItem('popularStocks', JSON.stringify(popularStocks));
@@ -370,40 +402,6 @@ const RoloApp = () => {
       }
     };
   }, [marketStatus, popularStocks, selectedStock]);
-
-  // Check market status with more detailed sessions
-  useEffect(() => {
-    const checkMarketStatus = () => {
-      const now = new Date();
-      const hours = now.getUTCHours() - 5; // EST
-      const minutes = now.getMinutes();
-      const day = now.getDay();
-      const time = hours + (minutes / 60);
-      
-      if (day === 0 || day === 6) {
-        // Futures open Sunday 6 PM EST
-        if (day === 0 && hours >= 18) {
-          setMarketStatus('Futures Open');
-        } else {
-          setMarketStatus('Weekend');
-        }
-      } else if (time >= 4 && time < 9.5) {
-        setMarketStatus('Pre-Market');
-      } else if (time >= 9.5 && time < 16) {
-        setMarketStatus('Market Open');
-      } else if (time >= 16 && time < 20) {
-        setMarketStatus('After Hours');
-      } else if (hours >= 20 || hours < 4) {
-        setMarketStatus('Futures Open');
-      } else {
-        setMarketStatus('Market Closed');
-      }
-    };
-    
-    checkMarketStatus();
-    const interval = setInterval(checkMarketStatus, 60000);
-    return () => clearInterval(interval);
-  }, []);
 
   // Fetch stock data
   const fetchStockData = async (symbol) => {
@@ -1208,7 +1206,7 @@ const RoloApp = () => {
                   <div>
                     <p style={{ margin: '0', fontSize: '12px', color: '#9CA3AF' }}>Target</p>
                     <p style={{ margin: '0', fontWeight: 'bold', color: '#10B981' }}>
-                      ${play.targets?.[0]} {play.targets?.[1] && `/ ${play.targets[1]}`}
+                      ${play.targets?.[0]} {play.targets?.[1] && `/ $${play.targets[1]}`}
                     </p>
                   </div>
                 </div>
