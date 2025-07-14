@@ -1,7 +1,10 @@
+// netlify/functions/ai-analysis.js
+// AI-powered analysis using Gemini with all Alpha Vantage data
+
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 exports.handler = async (event, context) => {
-  const headers = {
+    const headers = {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Headers': 'Content-Type',
         'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
