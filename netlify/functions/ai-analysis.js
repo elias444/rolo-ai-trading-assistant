@@ -141,6 +141,14 @@ Format the response as JSON with the following structure:
             const now = new Date();
             const marketHour = now.getUTCHours() - 5; // EST
             
+            // Fetch additional market data for smart plays
+            const spyUrl = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=SPY&entitlement=realtime&apikey=${ALPHA_VANTAGE_API_KEY}`;
+            const spyResponse = await fetch(spyUrl);
+            const spyData = await spyResponse.json();
+            if (spyData['Global Quote']) {
+                marketData.spy = spyData['Global Quote'];
+            }
+            
             prompt = `You are Rolo, an expert AI trading analyst. Generate smart trading plays for the current market conditions.
 
 Current Market Data:
@@ -149,12 +157,15 @@ ${JSON.stringify(marketData, null, 2)}
 Market Time: ${now.toLocaleTimeString('en-US', { timeZone: 'America/New_York' })} EST
 Market Status: ${marketHour >= 9.5 && marketHour < 16 ? 'Open' : 'Closed/Extended Hours'}
 
-Generate 3-5 smart trading plays with the following criteria:
-- Focus on stocks with high momentum or unusual activity
-- Consider news sentiment and technical indicators
-- Provide specific entry, stop loss, and target prices
-- Include confidence levels and risk assessments
-- Mix of different strategies (momentum, value, options)
+IMPORTANT: Generate 3-5 REAL trading plays based on the ACTUAL market data provided above. Use REAL stock symbols and REAL prices.
+
+Requirements for each play:
+- Use ACTUAL stocks from the top gainers/losers or well-known symbols
+- Entry prices must be realistic based on current market prices
+- Stop loss should be 2-5% below entry
+- Targets should be 3-10% above entry (depending on timeframe)
+- Consider the actual news sentiment and market conditions
+- Base confidence on real technical and fundamental factors
 
 Format as JSON:
 {
@@ -164,16 +175,16 @@ Format as JSON:
     {
       "emoji": "appropriate emoji",
       "title": "catchy title",
-      "ticker": "SYMBOL",
+      "ticker": "REAL SYMBOL",
       "strategy": "momentum/value/options/swing",
       "confidence": number (0-100),
-      "entry": number,
-      "stopLoss": number,
-      "targets": [target1, target2],
+      "entry": realistic price number,
+      "stopLoss": realistic stop loss price,
+      "targets": [realistic target1, realistic target2],
       "timeframe": "intraday/short-term/medium-term",
       "riskLevel": "low/medium/high",
-      "reasoning": "brief explanation",
-      "newsImpact": "any relevant news"
+      "reasoning": "specific explanation based on real data",
+      "newsImpact": "actual news if relevant"
     }
   ]
 }`;
