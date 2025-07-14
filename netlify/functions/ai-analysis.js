@@ -1,6 +1,3 @@
-// netlify/functions/ai-analysis.js
-// AI-powered analysis using Gemini with all Alpha Vantage data
-
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 exports.handler = async (event, context) => {
@@ -15,7 +12,7 @@ exports.handler = async (event, context) => {
         return { statusCode: 200, headers, body: '' };
     }
 
-    const { symbol, type = 'analysis' } = JSON.parse(event.body || '{}');
+    const { symbol, type = 'analysis', favorites = [] } = JSON.parse(event.body || '{}');
     
     if (!symbol && type === 'analysis') {
         return {
@@ -80,6 +77,28 @@ exports.handler = async (event, context) => {
             marketData.topLosers = moversData.top_losers.slice(0, 3);
         }
 
+        // Added: Yahoo sentiment for political/social
+        let yahooSentiment = 'Neutral';
+        if (symbol) {
+            const yahooRes = await fetch(`https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbol}`);
+            const yahooData = await yahooRes.json();
+            yahooSentiment = yahooData.quoteResponse ? yahooData.quoteResponse.result[0].sentiment : 'Neutral';
+        }
+        marketData.yahooSentiment = yahooSentiment;
+
+        // Added: Confidence calc based on data
+        let confidence = 50;
+        if (marketData.rsi) {
+            const rsiValue = parseFloat(marketData.rsi.RSI);
+            if (rsiValue < 30 || rsiValue > 70) confidence += 20; // Extreme RSI
+        }
+        if (marketData.news) {
+            const positiveNews = marketData.news.filter(item => item.overall_sentiment_label === 'Bullish').length;
+            if (positiveNews > 2) confidence += 15;
+        }
+        if (yahooSentiment === 'Bullish') confidence += 15;
+        confidence = Math.min(100, confidence);
+
         // Initialize Gemini AI
         const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
@@ -92,6 +111,8 @@ exports.handler = async (event, context) => {
 Current Market Data:
 ${JSON.stringify(marketData, null, 2)}
 
+User favorites for learning: ${favorites.join(', ') || 'None'}
+
 Provide a detailed analysis including:
 1. Current Price Action Analysis (with specific price levels)
 2. Technical Indicators Interpretation
@@ -103,6 +124,8 @@ Provide a detailed analysis including:
 8. Risk/Reward Ratio
 9. Options Strategy Recommendation (if applicable)
 10. Overall Trading Recommendation with confidence level
+
+Use emojis 📈 for engaging.
 
 Format the response as JSON with the following structure:
 {
@@ -132,7 +155,7 @@ Format the response as JSON with the following structure:
   },
   "recommendation": {
     "action": "buy/sell/hold",
-    "confidence": number (0-100),
+    "confidence": ${confidence}, // Use this calculated value
     "strategy": "detailed strategy",
     "risks": ["risk1", "risk2"]
   }
@@ -140,14 +163,6 @@ Format the response as JSON with the following structure:
         } else if (type === 'smartplays') {
             const now = new Date();
             const marketHour = now.getUTCHours() - 5; // EST
-            
-            // Fetch additional market data for smart plays
-            const spyUrl = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=SPY&entitlement=realtime&apikey=${ALPHA_VANTAGE_API_KEY}`;
-            const spyResponse = await fetch(spyUrl);
-            const spyData = await spyResponse.json();
-            if (spyData['Global Quote']) {
-                marketData.spy = spyData['Global Quote'];
-            }
             
             prompt = `You are Rolo, an expert AI trading analyst. Generate smart trading plays for the current market conditions.
 
@@ -157,15 +172,16 @@ ${JSON.stringify(marketData, null, 2)}
 Market Time: ${now.toLocaleTimeString('en-US', { timeZone: 'America/New_York' })} EST
 Market Status: ${marketHour >= 9.5 && marketHour < 16 ? 'Open' : 'Closed/Extended Hours'}
 
-IMPORTANT: Generate 3-5 REAL trading plays based on the ACTUAL market data provided above. Use REAL stock symbols and REAL prices.
+User favorites for learning: ${favorites.join(', ') || 'None'}
 
-Requirements for each play:
-- Use ACTUAL stocks from the top gainers/losers or well-known symbols
-- Entry prices must be realistic based on current market prices
-- Stop loss should be 2-5% below entry
-- Targets should be 3-10% above entry (depending on timeframe)
-- Consider the actual news sentiment and market conditions
-- Base confidence on real technical and fundamental factors
+Generate 3-5 smart trading plays with the following criteria:
+- Focus on stocks with high momentum or unusual activity
+- Consider news sentiment and technical indicators
+- Provide specific entry, stop loss, and target prices
+- Include confidence levels and risk assessments
+- Mix of different strategies (momentum, value, options)
+
+Use emojis 📈 for engaging.
 
 Format as JSON:
 {
@@ -175,16 +191,16 @@ Format as JSON:
     {
       "emoji": "appropriate emoji",
       "title": "catchy title",
-      "ticker": "REAL SYMBOL",
+      "ticker": "SYMBOL",
       "strategy": "momentum/value/options/swing",
       "confidence": number (0-100),
-      "entry": realistic price number,
-      "stopLoss": realistic stop loss price,
-      "targets": [realistic target1, realistic target2],
+      "entry": number,
+      "stopLoss": number,
+      "targets": [target1, target2],
       "timeframe": "intraday/short-term/medium-term",
       "riskLevel": "low/medium/high",
-      "reasoning": "specific explanation based on real data",
-      "newsImpact": "actual news if relevant"
+      "reasoning": "brief explanation",
+      "newsImpact": "any relevant news"
     }
   ]
 }`;
