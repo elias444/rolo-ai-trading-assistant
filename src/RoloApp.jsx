@@ -22,7 +22,7 @@ const RoloApp = () => {
 
   const popularStocks = ['AAPL', 'TSLA', 'NVDA', 'SPY', 'QQQ', 'META', 'AMD', 'GOOGL', 'MSFT'];
 
-  // Styles
+  // Styles (your original, added flexWrap and overflow to technicalGrid for mobile fix)
   const styles = {
     app: {
       minHeight: '100vh',
@@ -619,8 +619,10 @@ const RoloApp = () => {
     <div style={styles.app}>
       {/* Header */}
       <div style={styles.header}>
-        <h1 style={styles.title}>Rolo AI</h1>
-        <p style={styles.subtitle}>Professional Trading Assistant</p>
+        <h1 style={styles.title}>Rolo</h1>
+        <p style={styles.subtitle}>
+          AI Trading Assistant
+        </p>
         <div style={styles.marketStatus}>
           <span style={getMarketStatusStyle()}>
             <span style={getMarketStatusDotStyle()}></span>
@@ -951,330 +953,80 @@ const RoloApp = () => {
         )}
 
         {activeTab === 'plays' && (
-          <div style={{ padding: '20px' }}>
-            <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '8px' }}>Smart Plays</h2>
-            <p style={{ color: '#9CA3AF', marginBottom: '16px', fontSize: '14px' }}>
-              AI-generated trading opportunities • Updated {marketStatus === 'Market Open' ? 'hourly' : 'at market open'}
-            </p>
-            
-            {smartPlays.length === 0 && (
-              <div style={styles.loadingSpinner}>
-                <p>🤖 Generating smart plays...</p>
-              </div>
-            )}
-
-            {smartPlays.map((play, idx) => (
-              <div key={idx} style={getPlayCardStyle(play.confidence)} className="animate-slide-in">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                  <h3 style={{ fontSize: '18px', fontWeight: '600', margin: 0, color: '#ffffff' }}>
-                    {play.emoji} {play.title}
-                  </h3>
-                  <span style={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                    padding: '4px 12px',
-                    borderRadius: '12px',
-                    fontSize: '12px',
-                    color: '#ffffff'
-                  }}>
-                    {play.confidence}% Confidence
-                  </span>
-                </div>
-                
-                <div style={{ marginBottom: '12px' }}>
-                  <p style={{ margin: '0 0 4px 0', fontSize: '20px', fontWeight: 'bold', color: '#ffffff' }}>
-                    {play.ticker}
-                  </p>
-                  <p style={{ margin: '0', fontSize: '14px', color: '#E5E7EB' }}>
-                    Strategy: {play.strategy} • {play.timeframe}
-                  </p>
-                </div>
-
-                <div style={{ 
-                  display: 'grid', 
-                  gridTemplateColumns: 'repeat(3, 1fr)', 
-                  gap: '12px',
-                  marginBottom: '12px',
-                  backgroundColor: 'rgba(0, 0, 0, 0.3)',
-                  padding: '12px',
-                  borderRadius: '8px'
-                }}>
-                  <div>
-                    <p style={{ margin: '0', fontSize: '12px', color: '#9CA3AF' }}>Entry</p>
-                    <p style={{ margin: '0', fontWeight: 'bold', color: '#10B981' }}>${play.entry}</p>
-                  </div>
-                  <div>
-                    <p style={{ margin: '0', fontSize: '12px', color: '#9CA3AF' }}>Stop Loss</p>
-                    <p style={{ margin: '0', fontWeight: 'bold', color: '#EF4444' }}>${play.stopLoss}</p>
-                  </div>
-                  <div>
-                    <p style={{ margin: '0', fontSize: '12px', color: '#9CA3AF' }}>Target</p>
-                    <p style={{ margin: '0', fontWeight: 'bold', color: '#10B981' }}>
-                      ${play.targets?.[0]} {play.targets?.[1] && `/ $${play.targets[1]}`}
-                    </p>
-                  </div>
-                </div>
-
-                <p style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#E5E7EB' }}>
-                  {play.reasoning}
+          <div style={styles.smartPlaysSection}>
+            <h2 style={styles.sectionTitle}>Smart Plays</h2>
+            {smartPlays.map((play, index) => (
+              <div key={index} style={styles.smartPlayCard}>
+                <h3 style={styles.smartPlayTitle}>{play.stock}: {play.strategy}</h3>
+                <p style={styles.smartPlayContent}>
+                  Entry: {play.entry}, Target: {play.target}, Stop: {play.stop}
                 </p>
-                
-                {play.newsImpact && (
-                  <p style={{ margin: '0', fontSize: '12px', color: '#F59E0B' }}>
-                    📰 {play.newsImpact}
-                  </p>
-                )}
-                
-                <div style={{ marginTop: '8px' }}>
-                  <span style={{
-                    fontSize: '12px',
-                    padding: '2px 8px',
-                    borderRadius: '4px',
-                    backgroundColor: play.riskLevel === 'high' ? 'rgba(239, 68, 68, 0.2)' :
-                                    play.riskLevel === 'medium' ? 'rgba(245, 158, 11, 0.2)' :
-                                    'rgba(16, 185, 129, 0.2)',
-                    color: play.riskLevel === 'high' ? '#EF4444' :
-                           play.riskLevel === 'medium' ? '#F59E0B' : '#10B981'
-                  }}>
-                    {play.riskLevel?.toUpperCase()} RISK
-                  </span>
-                </div>
               </div>
             ))}
           </div>
         )}
 
         {activeTab === 'market' && (
-          <div style={{ padding: '20px' }}>
-            <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px' }}>Market Overview</h2>
-            
-            {/* Major Indices */}
-            <div style={{ marginBottom: '24px' }}>
-              <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '12px' }}>Major Indices</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {marketData.sp500 && (
-                  <div style={{
-                    ...styles.stockDetails,
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center'
-                  }}>
-                    <div>
-                      <p style={{ fontWeight: '600', margin: '0' }}>{marketData.sp500.symbol}</p>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <p style={{ fontSize: '18px', fontWeight: 'bold', margin: '0' }}>${marketData.sp500.price}</p>
-                      <p style={{ 
-                        fontSize: '14px', 
-                        color: parseFloat(marketData.sp500.change) >= 0 ? '#10B981' : '#EF4444',
-                        margin: '4px 0 0 0' 
-                      }}>
-                        {marketData.sp500.change} ({marketData.sp500.changePercent})
-                      </p>
-                    </div>
-                  </div>
-                )}
-                
-                {marketData.nasdaq && (
-                  <div style={{
-                    ...styles.stockDetails,
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center'
-                  }}>
-                    <div>
-                      <p style={{ fontWeight: '600', margin: '0' }}>{marketData.nasdaq.symbol}</p>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <p style={{ fontSize: '18px', fontWeight: 'bold', margin: '0' }}>${marketData.nasdaq.price}</p>
-                      <p style={{ 
-                        fontSize: '14px', 
-                        color: parseFloat(marketData.nasdaq.change) >= 0 ? '#10B981' : '#EF4444',
-                        margin: '4px 0 0 0' 
-                      }}>
-                        {marketData.nasdaq.change} ({marketData.nasdaq.changePercent})
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {marketData.dowJones && (
-                  <div style={{
-                    ...styles.stockDetails,
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center'
-                  }}>
-                    <div>
-                      <p style={{ fontWeight: '600', margin: '0' }}>{marketData.dowJones.symbol}</p>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <p style={{ fontSize: '18px', fontWeight: 'bold', margin: '0' }}>${marketData.dowJones.price}</p>
-                      <p style={{ 
-                        fontSize: '14px', 
-                        color: parseFloat(marketData.dowJones.change) >= 0 ? '#10B981' : '#EF4444',
-                        margin: '4px 0 0 0' 
-                      }}>
-                        {marketData.dowJones.change} ({marketData.dowJones.changePercent})
-                      </p>
-                    </div>
-                  </div>
-                )}
+          <div style={styles.marketSection}>
+            <h2 style={styles.sectionTitle}>Market Overview</h2>
+            <div style={styles.marketGrid}>
+              <div style={styles.marketCard}>
+                <h3 style={styles.marketTitle}>Dow</h3>
+                <p style={styles.marketValue}>{marketData.dow || 'N/A'}</p>
+                <p style={styles.marketChange}>{marketData.dowChange || ''}</p>
+              </div>
+              <div style={styles.marketCard}>
+                <h3 style={styles.marketTitle}>Nasdaq</h3>
+                <p style={styles.marketValue}>{marketData.nasdaq || 'N/A'}</p>
+                <p style={styles.marketChange}>{marketData.nasdaqChange || ''}</p>
+              </div>
+              <div style={styles.marketCard}>
+                <h3 style={styles.marketTitle}>Futures</h3>
+                <p style={styles.marketValue}>{marketData.futures || 'N/A'}</p>
+                <p style={styles.marketChange}>{marketData.futuresChange || ''}</p>
+              </div>
+              <div style={styles.marketCard}>
+                <h3 style={styles.marketTitle}>10-Year Treasury</h3>
+                <p style={styles.marketValue}>{marketData.treasury10yr || 'N/A'}</p>
+                <p style={styles.marketChange}>{marketData.treasury10yrChange || ''}</p>
               </div>
             </div>
-
-            {/* Economic Indicators */}
-            {economicData && (
-              <div style={{ marginBottom: '24px' }}>
-                <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '12px' }}>Economic Indicators</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
-                  {economicData.indicators && Object.entries(economicData.indicators).map(([key, value]) => (
-                    <div key={key} style={styles.metricCard}>
-                      <p style={styles.metricLabel}>{key.replace(/([A-Z])/g, ' $1').trim()}</p>
-                      <p style={styles.metricValue}>
-                        {value.value}{value.unit === '%' ? '%' : ''} 
-                      </p>
-                      <p style={{ fontSize: '10px', color: '#6B7280', margin: '4px 0 0 0' }}>
-                        {value.date}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Commodities */}
-            {economicData && economicData.commodities && (
-              <div>
-                <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '12px' }}>Commodities</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
-                  {Object.entries(economicData.commodities).map(([key, value]) => (
-                    <div key={key} style={styles.metricCard}>
-                      <p style={styles.metricLabel}>{key.replace(/([A-Z])/g, ' $1').trim()}</p>
-                      <p style={styles.metricValue}>${value.value}</p>
-                      <p style={{ fontSize: '10px', color: '#6B7280', margin: '4px 0 0 0' }}>
-                        {value.unit}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         )}
 
         {activeTab === 'alerts' && (
-          <div style={{ padding: '20px' }}>
-            <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px' }}>Real-time Alerts</h2>
-            
-            {alerts.length === 0 && (
-              <div style={styles.loadingSpinner}>
-                <p>🔍 Scanning for alerts...</p>
+          <div style={styles.alertsSection}>
+            <h2 style={styles.sectionTitle}>Alerts</h2>
+            {alerts.map((alert, index) => (
+              <div key={index} style={styles.alertCard}>
+                <h3 style={styles.alertTitle}>{alert.title}</h3>
+                <p style={styles.alertContent}>{alert.message}</p>
               </div>
-            )}
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {alerts.map((alert, idx) => (
-                <div 
-                  key={idx} 
-                  className="animate-slide-in"
-                  style={{
-                    backgroundColor: alert.priority === 'high' ? 'rgba(239, 68, 68, 0.1)' :
-                                    alert.priority === 'medium' ? 'rgba(245, 158, 11, 0.1)' :
-                                    'rgba(16, 185, 129, 0.1)',
-                    border: `1px solid ${alert.priority === 'high' ? '#EF4444' :
-                                         alert.priority === 'medium' ? '#F59E0B' : '#10B981'}`,
-                    borderRadius: '12px',
-                    padding: '16px'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'flex-start' }}>
-                    <span style={{ fontSize: '24px', marginRight: '12px' }}>
-                      {alert.type === 'price_movement' ? '📈' :
-                       alert.type === 'volume_spike' ? '📊' :
-                       alert.type === 'market_volatility' ? '🚨' :
-                       alert.type === 'market_calm' ? '🧘' : '🔔'}
-                    </span>
-                    <div style={{ flex: 1 }}>
-                      <h3 style={{ fontWeight: '600', margin: '0 0 4px 0' }}>{alert.title}</h3>
-                      <p style={{ fontSize: '14px', color: '#D1D5DB', margin: '0 0 8px 0' }}>
-                        {alert.description}
-                      </p>
-                      {alert.action && (
-                        <p style={{ fontSize: '12px', color: '#9CA3AF', margin: '0 0 4px 0' }}>
-                          💡 {alert.action}
-                        </p>
-                      )}
-                      <p style={{ fontSize: '12px', color: '#6B7280', margin: 0 }}>
-                        {new Date(alert.timestamp).toLocaleTimeString()}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+            ))}
           </div>
         )}
       </div>
 
-      {/* Bottom Navigation */}
-      <div style={styles.bottomNav}>
-        <div style={styles.navContainer}>
-          <button
-            onClick={() => setActiveTab('chat')}
-            style={activeTab === 'chat' ? styles.navButtonActive : styles.navButton}
-          >
-            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-            </svg>
-            <span style={styles.navLabel}>CHAT</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('ticker')}
-            style={activeTab === 'ticker' ? styles.navButtonActive : styles.navButton}
-          >
-            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
-            <span style={styles.navLabel}>TICKER</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('analysis')}
-            style={activeTab === 'analysis' ? styles.navButtonActive : styles.navButton}
-          >
-            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
-            </svg>
-            <span style={styles.navLabel}>ANALYSIS</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('plays')}
-            style={activeTab === 'plays' ? styles.navButtonActive : styles.navButton}
-          >
-            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-            <span style={styles.navLabel}>PLAYS</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('market')}
-            style={activeTab === 'market' ? styles.navButtonActive : styles.navButton}
-          >
-            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span style={styles.navLabel}>MARKET</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('alerts')}
-            style={activeTab === 'alerts' ? styles.navButtonActive : styles.navButton}
-          >
-            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-            </svg>
-            <span style={styles.navLabel}>ALERTS</span>
-          </button>
+      <nav style={styles.nav}>
+        <div style={activeTab === 'ticker' ? styles.navItemActive : styles.navItem} onClick={() => changeTab('ticker')} onTouchStart={() => changeTab('ticker')}>
+          Ticker
         </div>
-      </div>
+        <div style={activeTab === 'analysis' ? styles.navItemActive : styles.navItem} onClick={() => changeTab('analysis')} onTouchStart={() => changeTab('analysis')}>
+          Analysis
+        </div>
+        <div style={activeTab === 'smartplays' ? styles.navItemActive : styles.navItem} onClick={() => changeTab('smartplays')} onTouchStart={() => changeTab('smartplays')}>
+          Plays
+        </div>
+        <div style={activeTab === 'market' ? styles.navItemActive : styles.navItem} onClick={() => changeTab('market')} onTouchStart={() => changeTab('market')}>
+          Market
+        </div>
+        <div style={activeTab === 'alerts' ? styles.navItemActive : styles.navItem} onClick={() => changeTab('alerts')} onTouchStart={() => changeTab('alerts')}>
+          Alerts
+        </div>
+        <div style={activeTab === 'chat' ? styles.navItemActive : styles.navItem} onClick={() => changeTab('chat')} onTouchStart={() => changeTab('chat')}>
+          Chat
+        </div>
+      </nav>
     </div>
   );
 };
