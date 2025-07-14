@@ -32,7 +32,7 @@ exports.handler = async (event, context) => {
         return {
             statusCode: 500,
             headers,
-            body: JSON.stringify({ error: 'API keys not configured' })
+            body: JSON.stringify({ error: 'API keys not configured. Please check GEMINI_API_KEY and ALPHA_VANTAGE_API_KEY environment variables.' })
         };
     }
 
@@ -44,40 +44,58 @@ exports.handler = async (event, context) => {
 
         // 1. Get real-time quote data
         if (symbol) {
-            const quoteUrl = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&entitlement=realtime&apikey=${ALPHA_VANTAGE_API_KEY}`;
-            const quoteResponse = await fetch(quoteUrl);
-            const quoteData = await quoteResponse.json();
-            if (quoteData['Global Quote']) {
-                marketData.quote = quoteData['Global Quote'];
+            try {
+                const quoteUrl = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&entitlement=realtime&apikey=${ALPHA_VANTAGE_API_KEY}`;
+                const quoteResponse = await fetch(quoteUrl);
+                const quoteData = await quoteResponse.json();
+                if (quoteData['Global Quote']) {
+                    marketData.quote = quoteData['Global Quote'];
+                }
+            } catch (e) {
+                console.warn(`[ai-analysis.js] Could not fetch quote for ${symbol}:`, e.message);
             }
         }
 
-        // 2. Get technical indicators
+        // 2. Get technical indicators (RSI only for speed)
         if (symbol) {
-            const rsiUrl = `https://www.alphavantage.co/query?function=RSI&symbol=${symbol}&interval=daily&time_period=14&series_type=close&apikey=${ALPHA_VANTAGE_API_KEY}`;
-            const rsiResponse = await fetch(rsiUrl);
-            const rsiData = await rsiResponse.json();
-            if (rsiData['Technical Analysis: RSI']) {
-                const latestDate = Object.keys(rsiData['Technical Analysis: RSI'])[0];
-                marketData.rsi = rsiData['Technical Analysis: RSI'][latestDate];
+            try {
+                const rsiUrl = `https://www.alphavantage.co/query?function=RSI&symbol=${symbol}&interval=daily&time_period=14&series_type=close&apikey=${ALPHA_VANTAGE_API_KEY}`;
+                const rsiResponse = await fetch(rsiUrl);
+                const rsiData = await rsiResponse.json();
+                if (rsiData['Technical Analysis: RSI']) {
+                    const latestDate = Object.keys(rsiData['Technical Analysis: RSI'])[0];
+                    marketData.rsi = rsiData['Technical Analysis: RSI'][latestDate];
+                }
+            } catch (e) {
+                console.warn(`[ai-analysis.js] Could not fetch RSI for ${symbol}:`, e.message);
             }
         }
 
-        // 3. Get news sentiment
-        const newsUrl = `https://www.alphavantage.co/query?function=NEWS_SENTIMENT${symbol ? `&tickers=${symbol}` : ''}&apikey=${ALPHA_VANTAGE_API_KEY}`;
-        const newsResponse = await fetch(newsUrl);
-        const newsData = await newsResponse.json();
-        if (newsData.feed) {
-            marketData.news = newsData.feed.slice(0, 5);
+        // 3. Get news sentiment (limit to prevent timeout)
+        try {
+            const newsUrl = `https://www.alphavantage.co/query?function=NEWS_SENTIMENT${symbol ? `&tickers=${symbol}&limit=5` : '&limit=5'}&apikey=${ALPHA_VANTAGE_API_KEY}`;
+            const newsResponse = await fetch(newsUrl);
+            const newsData = await newsResponse.json();
+            if (newsData.feed) {
+                marketData.news = newsData.feed.slice(0, 3); // Limit to 3 articles
+            }
+        } catch (e) {
+            console.warn(`[ai-analysis.js] Could not fetch news:`, e.message);
         }
 
-        // 4. Get market movers
-        const moversUrl = `https://www.alphavantage.co/query?function=TOP_GAINERS_LOSERS&apikey=${ALPHA_VANTAGE_API_KEY}`;
-        const moversResponse = await fetch(moversUrl);
-        const moversData = await moversResponse.json();
-        if (moversData.top_gainers) {
-            marketData.topGainers = moversData.top_gainers.slice(0, 3);
-            marketData.topLosers = moversData.top_losers.slice(0, 3);
+        // 4. Get market movers (for smart plays context)
+        if (type === 'smartplays') {
+            try {
+                const moversUrl = `https://www.alphavantage.co/query?function=TOP_GAINERS_LOSERS&apikey=${ALPHA_VANTAGE_API_KEY}`;
+                const moversResponse = await fetch(moversUrl);
+                const moversData = await moversResponse.json();
+                if (moversData.top_gainers) {
+                    marketData.topGainers = moversData.top_gainers.slice(0, 3);
+                    marketData.topLosers = moversData.top_losers.slice(0, 3);
+                }
+            } catch (e) {
+                console.warn(`[ai-analysis.js] Could not fetch market movers:`, e.message);
+            }
         }
 
         // Initialize Gemini AI
@@ -87,31 +105,22 @@ exports.handler = async (event, context) => {
         let prompt = '';
         
         if (type === 'analysis' && symbol) {
-            prompt = `You are Rolo, an expert AI trading analyst with access to real-time market data. Provide a comprehensive trading analysis for ${symbol}.
+            prompt = `You are Rolo, an expert AI trading analyst. Provide a comprehensive trading analysis for ${symbol}.
 
 Current Market Data:
 ${JSON.stringify(marketData, null, 2)}
 
-Provide a detailed analysis including:
-1. Current Price Action Analysis (with specific price levels)
-2. Technical Indicators Interpretation
-3. Support Levels (provide 3 specific price points)
-4. Resistance Levels (provide 3 specific price points)
-5. Entry Points (provide 2-3 specific prices with reasoning)
-6. Stop Loss Levels (specific prices)
-7. Price Targets (short-term and long-term with specific prices)
-8. Risk/Reward Ratio
-9. Options Strategy Recommendation (if applicable)
-10. Overall Trading Recommendation with confidence level
+Current time: ${new Date().toISOString()}
+Analysis request: Detailed trading analysis for ${symbol}
 
-Format the response as JSON with the following structure:
+Provide a detailed analysis in JSON format with the following structure:
 {
-  "summary": "brief 2-3 sentence overview",
-  "currentPrice": number,
+  "summary": "2-3 sentence overview of the stock's current situation",
+  "currentPrice": ${marketData.quote ? parseFloat(marketData.quote['05. price']) : 'null'},
   "technicalAnalysis": {
     "trend": "bullish/bearish/neutral",
     "strength": "strong/moderate/weak",
-    "rsi": number,
+    "rsi": ${marketData.rsi ? parseFloat(marketData.rsi.RSI) : 'null'},
     "rsiSignal": "overbought/oversold/neutral"
   },
   "levels": {
@@ -128,42 +137,48 @@ Format the response as JSON with the following structure:
       "shortTerm": {"price": number, "timeframe": "string"},
       "longTerm": {"price": number, "timeframe": "string"}
     },
-    "riskReward": "ratio like 1:3"
+    "riskReward": "1:X format"
   },
   "recommendation": {
     "action": "buy/sell/hold",
     "confidence": number (0-100),
-    "strategy": "detailed strategy",
-    "risks": ["risk1", "risk2"]
+    "strategy": "detailed strategy explanation",
+    "risks": ["risk1", "risk2", "risk3"]
   }
-}`;
+}
+
+IMPORTANT: 
+- Use realistic price levels based on current price
+- Provide specific, actionable entry points
+- Include detailed reasoning
+- Response must be valid JSON only, no extra text`;
+
         } else if (type === 'smartplays') {
             const now = new Date();
             const marketHour = now.getUTCHours() - 5; // EST
             
-            prompt = `You are Rolo, an expert AI trading analyst. Generate smart trading plays for the current market conditions.
+            prompt = `You are Rolo, an expert AI trading analyst. Generate smart trading plays for current market conditions.
 
 Current Market Data:
 ${JSON.stringify(marketData, null, 2)}
 
-Market Time: ${now.toLocaleTimeString('en-US', { timeZone: 'America/New_York' })} EST
+Current time: ${now.toISOString()}
 Market Status: ${marketHour >= 9.5 && marketHour < 16 ? 'Open' : 'Closed/Extended Hours'}
 
-Generate 3-5 smart trading plays with the following criteria:
-- Focus on stocks with high momentum or unusual activity
+Generate 2-4 smart trading plays based on current market data. Focus on:
+- Stocks with momentum or unusual activity
 - Consider news sentiment and technical indicators
 - Provide specific entry, stop loss, and target prices
 - Include confidence levels and risk assessments
-- Mix of different strategies (momentum, value, options)
 
 Format as JSON:
 {
-  "timestamp": "ISO timestamp",
+  "timestamp": "${now.toISOString()}",
   "marketCondition": "bullish/bearish/neutral",
   "plays": [
     {
-      "emoji": "appropriate emoji",
-      "title": "catchy title",
+      "emoji": "📈",
+      "title": "descriptive title",
       "ticker": "SYMBOL",
       "strategy": "momentum/value/options/swing",
       "confidence": number (0-100),
@@ -172,11 +187,13 @@ Format as JSON:
       "targets": [target1, target2],
       "timeframe": "intraday/short-term/medium-term",
       "riskLevel": "low/medium/high",
-      "reasoning": "brief explanation",
-      "newsImpact": "any relevant news"
+      "reasoning": "detailed explanation why this is a good play",
+      "newsImpact": "any relevant news affecting this play"
     }
   ]
-}`;
+}
+
+IMPORTANT: Response must be valid JSON only, no extra text`;
         }
 
         const result = await model.generateContent(prompt);
@@ -195,9 +212,32 @@ Format as JSON:
             }
         } catch (parseError) {
             console.error('Failed to parse Gemini response:', text);
-            analysisResult = { error: 'Failed to parse AI response', rawResponse: text };
+            analysisResult = { 
+                error: 'Failed to parse AI response', 
+                rawResponse: text.substring(0, 500),
+                fallback: type === 'analysis' ? {
+                    summary: `Analysis for ${symbol} is being processed. Please try again in a moment.`,
+                    technicalAnalysis: { trend: 'neutral', strength: 'moderate' },
+                    recommendation: { action: 'hold', confidence: 50 }
+                } : {
+                    plays: [{
+                        emoji: '⏳',
+                        title: 'Analysis in Progress',
+                        ticker: 'MARKET',
+                        strategy: 'patience',
+                        confidence: 50,
+                        entry: 0,
+                        stopLoss: 0,
+                        targets: [0],
+                        timeframe: 'pending',
+                        riskLevel: 'low',
+                        reasoning: 'AI analysis is being processed. Please try again shortly.'
+                    }]
+                }
+            };
         }
 
+        console.log(`[ai-analysis.js] Successfully generated ${type} analysis`);
         return {
             statusCode: 200,
             headers,
@@ -205,7 +245,13 @@ Format as JSON:
                 type,
                 symbol,
                 analysis: analysisResult,
-                timestamp: new Date().toISOString()
+                timestamp: new Date().toISOString(),
+                dataQuality: {
+                    hasQuote: !!marketData.quote,
+                    hasRSI: !!marketData.rsi,
+                    hasNews: !!(marketData.news && marketData.news.length > 0),
+                    hasMovers: !!(marketData.topGainers && marketData.topGainers.length > 0)
+                }
             })
         };
 
@@ -214,7 +260,10 @@ Format as JSON:
         return {
             statusCode: 500,
             headers,
-            body: JSON.stringify({ error: error.message })
+            body: JSON.stringify({ 
+                error: `AI analysis error: ${error.message}`,
+                details: 'Check server logs for more information'
+            })
         };
     }
 };
