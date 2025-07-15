@@ -16,10 +16,9 @@ const RoloApp = () => {
     market: false,
     alerts: false
   });
-  const [debugInfo, setDebugInfo] = useState({}); // Add debug info state
   const [marketStatus, setMarketStatus] = useState('Loading...');
   const [chatMessages, setChatMessages] = useState([
-    { role: 'ai', content: "Hello! I'm Rolo, your 24/7 AI trading assistant. I'm checking my data connections..." }
+    { role: 'ai', content: "Hello! I'm Rolo, your 24/7 AI trading assistant with access to real-time market data, futures, pre-market, news, and social sentiment. How can I help you today?" }
   ]);
   const [chatInput, setChatInput] = useState('');
   const [popularStocks, setPopularStocks] = useState(['AAPL', 'TSLA', 'NVDA', 'SPY', 'QQQ', 'META', 'AMD', 'GOOGL', 'MSFT']);
@@ -38,22 +37,22 @@ const RoloApp = () => {
     
     let status = 'Market Closed';
     
-    if (day === 0) { // Sunday
+    if (day === 0) {
       if (hours >= 18) {
         status = 'Futures Open';
       } else {
         status = 'Weekend';
       }
-    } else if (day === 6) { // Saturday
+    } else if (day === 6) {
       status = 'Weekend';
-    } else { // Monday-Friday
-      if (totalMinutes >= 240 && totalMinutes < 570) { // 4:00 AM - 9:30 AM
+    } else {
+      if (totalMinutes >= 240 && totalMinutes < 570) {
         status = 'Pre-Market';
-      } else if (totalMinutes >= 570 && totalMinutes < 960) { // 9:30 AM - 4:00 PM
+      } else if (totalMinutes >= 570 && totalMinutes < 960) {
         status = 'Market Open';
-      } else if (totalMinutes >= 960 && totalMinutes < 1200) { // 4:00 PM - 8:00 PM
+      } else if (totalMinutes >= 960 && totalMinutes < 1200) {
         status = 'After Hours';
-      } else if (totalMinutes >= 1080 || totalMinutes < 240) { // 6:00 PM - 4:00 AM
+      } else if (totalMinutes >= 1080 || totalMinutes < 240) {
         status = 'Futures Open';
       } else {
         status = 'Market Closed';
@@ -64,58 +63,34 @@ const RoloApp = () => {
     setLastUpdate(new Date());
   }, []);
 
-  // Test function availability
-  const testFunctions = useCallback(async () => {
-    console.log('[RoloApp] Testing function availability...');
-    const functions = [
-      'market-dashboard',
-      'comprehensive-ai-analysis', 
-      'enhanced-stock-data',
-      'smart-plays-generator',
-      'realtime-alerts',
-      'enhanced-rolo-chat'
-    ];
-    
-    const results = {};
-    
-    for (const funcName of functions) {
-      try {
-        const response = await fetch(`/.netlify/functions/${funcName}`, {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' }
-        });
-        
-        results[funcName] = {
-          exists: true,
-          status: response.status,
-          ok: response.ok
-        };
-        
-        if (!response.ok) {
-          const errorText = await response.text();
-          results[funcName].error = errorText.substring(0, 200);
-        }
-      } catch (error) {
-        results[funcName] = {
-          exists: false,
-          error: error.message
-        };
-      }
+  // Auto-refresh intervals based on market session
+  const getRefreshInterval = useCallback(() => {
+    switch (marketStatus) {
+      case 'Market Open':
+        return 30000;
+      case 'Pre-Market':
+      case 'After Hours':
+        return 60000;
+      case 'Futures Open':
+        return 120000;
+      default:
+        return 300000;
     }
-    
-    setDebugInfo(results);
-    console.log('[RoloApp] Function test results:', results);
-  }, []);
+  }, [marketStatus]);
 
-  // Enhanced stock data fetching with better error handling
+  useEffect(() => {
+    checkMarketStatus();
+    const statusInterval = setInterval(checkMarketStatus, 60000);
+    return () => clearInterval(statusInterval);
+  }, [checkMarketStatus]);
+
+  // Enhanced stock data fetching with session awareness
   const fetchStockData = useCallback(async (symbol) => {
     if (!symbol) return;
     
     setIsLoading(prev => ({ ...prev, stocks: true }));
     try {
-      console.log(`[RoloApp] Fetching stock data for ${symbol}...`);
       const response = await fetch(`/.netlify/functions/enhanced-stock-data?symbol=${symbol}`);
-      
       if (response.ok) {
         const data = await response.json();
         setStockData(prev => ({ 
@@ -126,47 +101,17 @@ const RoloApp = () => {
             lastFetched: new Date().toISOString()
           }
         }));
-        console.log(`[RoloApp] ✅ Got stock data for ${symbol}:`, data);
       } else {
-        const errorText = await response.text();
-        console.error(`[RoloApp] Stock data error for ${symbol}:`, response.status, errorText);
+        console.error(`Failed to fetch data for ${symbol}:`, response.status);
       }
     } catch (error) {
-      console.error('[RoloApp] Stock data fetch error:', error);
+      console.error('Error fetching stock data:', error);
     } finally {
       setIsLoading(prev => ({ ...prev, stocks: false }));
     }
   }, [marketStatus]);
 
-  // Enhanced market dashboard fetching
-  const fetchMarketDashboard = useCallback(async () => {
-    setIsLoading(prev => ({ ...prev, market: true }));
-    try {
-      console.log('[RoloApp] Fetching market dashboard...');
-      const response = await fetch('/.netlify/functions/market-dashboard');
-      
-      if (response.ok) {
-        const data = await response.json();
-        setMarketData({
-          ...data,
-          marketSession: marketStatus,
-          lastUpdated: new Date().toISOString()
-        });
-        console.log('[RoloApp] ✅ Got market data:', data);
-      } else {
-        const errorText = await response.text();
-        console.error('[RoloApp] Market dashboard error:', response.status, errorText);
-        setMarketData({ error: `API Error: ${response.status}`, details: errorText.substring(0, 200) });
-      }
-    } catch (error) {
-      console.error('[RoloApp] Market dashboard fetch error:', error);
-      setMarketData({ error: 'Network Error', details: error.message });
-    } finally {
-      setIsLoading(prev => ({ ...prev, market: false }));
-    }
-  }, [marketStatus]);
-
-  // Enhanced AI Analysis with better error handling
+  // 24/7 AI Analysis with comprehensive data
   const fetchAIAnalysis = useCallback(async (symbol) => {
     if (!symbol) return;
     
@@ -174,7 +119,6 @@ const RoloApp = () => {
     setAnalysisData(null);
     
     try {
-      console.log(`[RoloApp] Fetching AI analysis for ${symbol}...`);
       const response = await fetch('/.netlify/functions/comprehensive-ai-analysis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -183,38 +127,30 @@ const RoloApp = () => {
       
       if (response.ok) {
         const data = await response.json();
-        if (data.analysis) {
+        if (data.analysis && !data.analysis.fallback) {
           setAnalysisData({
             ...data.analysis,
             dataQuality: data.dataQuality,
-            marketSession: data.marketData?.session || marketStatus,
+            marketSession: data.marketData.session,
             lastUpdated: data.timestamp
           });
-          console.log('[RoloApp] ✅ Got AI analysis:', data);
-        } else {
-          console.warn('[RoloApp] No analysis data returned:', data);
-          setAnalysisData({ error: 'No analysis available', details: data.error || 'Unknown error' });
         }
       } else {
-        const errorText = await response.text();
-        console.error('[RoloApp] AI analysis error:', response.status, errorText);
-        setAnalysisData({ error: `API Error: ${response.status}`, details: errorText.substring(0, 200) });
+        console.error('AI Analysis failed:', response.status);
       }
     } catch (error) {
-      console.error('[RoloApp] AI analysis fetch error:', error);
-      setAnalysisData({ error: 'Network Error', details: error.message });
+      console.error('Error fetching AI analysis:', error);
     } finally {
       setIsLoading(prev => ({ ...prev, analysis: false }));
     }
-  }, [marketStatus]);
+  }, []);
 
-  // Enhanced Smart Plays fetching
+  // Smart plays with real-time market opportunities
   const fetchSmartPlays = useCallback(async () => {
     setIsLoading(prev => ({ ...prev, plays: true }));
     setSmartPlays([]);
     
     try {
-      console.log('[RoloApp] Fetching smart plays...');
       const response = await fetch('/.netlify/functions/comprehensive-ai-analysis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -226,32 +162,47 @@ const RoloApp = () => {
         if (data.analysis && data.analysis.plays && data.analysis.plays.length > 0) {
           setSmartPlays(data.analysis.plays.map(play => ({
             ...play,
-            marketSession: data.marketData?.session || marketStatus,
+            marketSession: data.marketData.session,
             dataQuality: data.dataQuality,
             lastUpdated: data.timestamp
           })));
-          console.log('[RoloApp] ✅ Got smart plays:', data.analysis.plays);
-        } else {
-          console.log('[RoloApp] No smart plays available:', data);
         }
-      } else {
-        const errorText = await response.text();
-        console.error('[RoloApp] Smart plays error:', response.status, errorText);
       }
     } catch (error) {
-      console.error('[RoloApp] Smart plays fetch error:', error);
+      console.error('Error fetching smart plays:', error);
     } finally {
       setIsLoading(prev => ({ ...prev, plays: false }));
     }
+  }, []);
+
+  // Enhanced market dashboard with futures and pre-market
+  const fetchMarketDashboard = useCallback(async () => {
+    setIsLoading(prev => ({ ...prev, market: true }));
+    try {
+      const response = await fetch('/.netlify/functions/market-dashboard');
+      if (response.ok) {
+        const data = await response.json();
+        if (data && Object.keys(data).length > 0) {
+          setMarketData({
+            ...data,
+            marketSession: marketStatus,
+            lastUpdated: new Date().toISOString()
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching market data:', error);
+    } finally {
+      setIsLoading(prev => ({ ...prev, market: false }));
+    }
   }, [marketStatus]);
 
-  // Enhanced Alerts fetching
+  // Real-time alerts with comprehensive monitoring
   const fetchAlerts = useCallback(async () => {
     setIsLoading(prev => ({ ...prev, alerts: true }));
     setAlerts([]);
     
     try {
-      console.log('[RoloApp] Fetching alerts...');
       const response = await fetch('/.netlify/functions/comprehensive-ai-analysis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -263,45 +214,28 @@ const RoloApp = () => {
         if (data.analysis && data.analysis.alerts && data.analysis.alerts.length > 0) {
           setAlerts(data.analysis.alerts.map(alert => ({
             ...alert,
-            marketSession: data.marketData?.session || marketStatus,
+            marketSession: data.marketData.session,
             dataQuality: data.dataQuality,
             timestamp: data.timestamp
           })));
-          console.log('[RoloApp] ✅ Got alerts:', data.analysis.alerts);
-        } else {
-          console.log('[RoloApp] No alerts available:', data);
         }
-      } else {
-        const errorText = await response.text();
-        console.error('[RoloApp] Alerts error:', response.status, errorText);
       }
     } catch (error) {
-      console.error('[RoloApp] Alerts fetch error:', error);
+      console.error('Error fetching alerts:', error);
     } finally {
       setIsLoading(prev => ({ ...prev, alerts: false }));
     }
-  }, [marketStatus]);
+  }, []);
 
-  // Initialize everything
+  // Auto-refresh system based on market conditions
   useEffect(() => {
-    checkMarketStatus();
-    testFunctions(); // Test function availability on load
+    const interval = getRefreshInterval();
     
-    // Set up status checking
-    const statusInterval = setInterval(checkMarketStatus, 60000);
-    
-    return () => clearInterval(statusInterval);
-  }, [checkMarketStatus, testFunctions]);
-
-  // Auto-refresh based on active tab
-  useEffect(() => {
     const refreshData = () => {
-      // Always refresh popular stocks
       popularStocks.forEach(symbol => {
         fetchStockData(symbol);
       });
       
-      // Refresh current tab data
       switch (activeTab) {
         case 'analysis':
           if (selectedStock) fetchAIAnalysis(selectedStock);
@@ -315,19 +249,15 @@ const RoloApp = () => {
         case 'alerts':
           fetchAlerts();
           break;
-        default:
-          break;
       }
     };
 
-    // Initial load
     refreshData();
     
-    // Set up auto-refresh every 2 minutes for testing
-    const refreshInterval = setInterval(refreshData, 120000);
+    const refreshInterval = setInterval(refreshData, interval);
     
     return () => clearInterval(refreshInterval);
-  }, [activeTab, selectedStock, popularStocks, fetchStockData, fetchAIAnalysis, fetchSmartPlays, fetchMarketDashboard, fetchAlerts]);
+  }, [activeTab, selectedStock, popularStocks, getRefreshInterval, fetchStockData, fetchAIAnalysis, fetchSmartPlays, fetchMarketDashboard, fetchAlerts]);
 
   // Event handlers
   const handleTabChange = useCallback((tabId) => {
@@ -362,8 +292,6 @@ const RoloApp = () => {
       if (response.ok) {
         const data = await response.json();
         setChatMessages(prev => [...prev, { role: 'ai', content: data.response || 'Sorry, I encountered an error accessing real-time data.' }]);
-      } else {
-        setChatMessages(prev => [...prev, { role: 'ai', content: 'Sorry, I encountered an error. Please try again.' }]);
       }
     } catch (error) {
       setChatMessages(prev => [...prev, { role: 'ai', content: 'Sorry, I encountered an error. Please try again.' }]);
@@ -380,7 +308,6 @@ const RoloApp = () => {
       updatedStocks[index] = newSymbol.toUpperCase().trim();
       setPopularStocks(updatedStocks);
       
-      // Save to localStorage for persistence
       localStorage.setItem('roloPopularStocks', JSON.stringify(updatedStocks));
     }
   }, [popularStocks]);
@@ -482,7 +409,6 @@ const RoloApp = () => {
       flexDirection: 'column',
       fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif',
     }}>
-      {/* Enhanced Header */}
       <div style={{
         background: 'linear-gradient(to bottom, #1a1a1a, #000000)',
         padding: '20px',
@@ -509,35 +435,15 @@ const RoloApp = () => {
         <p style={{ fontSize: '12px', color: '#6B7280', margin: '4px 0 0 0' }}>
           {getUpdateFrequency()} • Last: {lastUpdate.toLocaleTimeString()}
         </p>
-        
-        {/* Debug Info */}
-        {Object.keys(debugInfo).length > 0 && (
-          <details style={{ marginTop: '10px', fontSize: '12px', color: '#9CA3AF' }}>
-            <summary style={{ cursor: 'pointer' }}>🔧 Function Status (Click to expand)</summary>
-            <div style={{ marginTop: '8px', textAlign: 'left', backgroundColor: '#1a1a1a', padding: '10px', borderRadius: '8px' }}>
-              {Object.entries(debugInfo).map(([funcName, info]) => (
-                <div key={funcName} style={{ marginBottom: '4px' }}>
-                  <span style={{ color: info.exists && info.ok ? '#10B981' : '#EF4444' }}>
-                    {funcName}: {info.exists ? (info.ok ? '✅ OK' : `❌ Error ${info.status}`) : '❌ Missing'}
-                  </span>
-                  {info.error && <div style={{ fontSize: '10px', color: '#6B7280', marginLeft: '10px' }}>{info.error}</div>}
-                </div>
-              ))}
-            </div>
-          </details>
-        )}
       </div>
 
-      {/* Main Content */}
       <div style={{
         flex: 1,
         overflowY: 'auto',
         paddingBottom: '80px',
       }}>
-        {/* Ticker Tab */}
         {activeTab === 'ticker' && (
           <div>
-            {/* Search Bar */}
             <div style={{ padding: '20px' }}>
               <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
                 <input
@@ -574,7 +480,6 @@ const RoloApp = () => {
               </div>
             </div>
 
-            {/* Popular Stocks */}
             <div style={{ padding: '0 20px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                 <h2 style={{
@@ -610,6 +515,16 @@ const RoloApp = () => {
                 <div style={{ textAlign: 'center', padding: '40px 20px', color: '#9CA3AF' }}>
                   <p style={{ fontSize: '48px', margin: '0 0 16px 0' }}>🔄</p>
                   <p>Loading real-time {marketStatus.toLowerCase()} data...</p>
+                </div>
+              )}
+
+              {!isLoading.stocks && Object.keys(stockData).length === 0 && (
+                <div style={{ textAlign: 'center', padding: '40px 20px', color: '#9CA3AF' }}>
+                  <p style={{ fontSize: '48px', margin: '0 0 16px 0' }}>📊</p>
+                  <p>No real stock data available</p>
+                  <p style={{ fontSize: '14px', marginTop: '8px' }}>
+                    Check your API configuration
+                  </p>
                 </div>
               )}
 
@@ -728,7 +643,6 @@ const RoloApp = () => {
                 </div>
               )}
 
-              {/* Selected Stock Details */}
               {selectedStock && stockData[selectedStock] && (
                 <div style={{
                   backgroundColor: '#1a1a1a',
@@ -810,7 +724,6 @@ const RoloApp = () => {
           </div>
         )}
 
-        {/* Analysis Tab */}
         {activeTab === 'analysis' && (
           <div style={{ padding: '20px' }}>
             <div style={{
@@ -842,21 +755,6 @@ const RoloApp = () => {
               </div>
             )}
 
-            {!isLoading.analysis && analysisData && analysisData.error && (
-              <div style={{ textAlign: 'center', padding: '40px 20px', color: '#9CA3AF' }}>
-                <p style={{ fontSize: '48px', margin: '0 0 16px 0' }}>⚠️</p>
-                <p style={{ fontSize: '18px', margin: '0 0 8px 0' }}>Analysis Error</p>
-                <p style={{ fontSize: '14px', margin: '0', color: '#EF4444' }}>
-                  {analysisData.error}
-                </p>
-                {analysisData.details && (
-                  <p style={{ fontSize: '12px', marginTop: '8px', color: '#6B7280' }}>
-                    {analysisData.details}
-                  </p>
-                )}
-              </div>
-            )}
-
             {!isLoading.analysis && !analysisData && (
               <div style={{ textAlign: 'center', padding: '40px 20px', color: '#9CA3AF' }}>
                 <p style={{ fontSize: '48px', margin: '0 0 16px 0' }}>📊</p>
@@ -867,219 +765,134 @@ const RoloApp = () => {
               </div>
             )}
 
-            {analysisData && !analysisData.error && !isLoading.analysis && (
+            {analysisData && !isLoading.analysis && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div style={{
-                  backgroundColor: '#1a1a1a',
-                  borderRadius: '16px',
-                  padding: '20px',
-                  border: '1px solid #374151',
-                }}>
-                  <h3 style={{ margin: '0 0 12px 0', color: '#3B82F6', fontSize: '18px' }}>
-                    📋 AI Analysis Results
-                  </h3>
-                  <pre style={{ 
-                    margin: 0, 
-                    lineHeight: 1.6, 
-                    fontSize: '14px',
-                    whiteSpace: 'pre-wrap',
-                    color: '#E5E7EB'
+                {analysisData.summary && (
+                  <div style={{
+                    backgroundColor: '#1a1a1a',
+                    borderRadius: '16px',
+                    padding: '20px',
+                    border: '1px solid #374151',
                   }}>
-                    {JSON.stringify(analysisData, null, 2)}
-                  </pre>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
+                    <h3 style={{ margin: '0 0 12px 0', color: '#3B82F6', fontSize: '18px' }}>
+                      📋 Executive Summary
+                    </h3>
+                    <p style={{ margin: 0, lineHeight: 1.6, fontSize: '16px' }}>{analysisData.summary}</p>
+                  </div>
+                )}
 
-        {/* Market Tab */}
-        {activeTab === 'market' && (
-          <div style={{ padding: '20px' }}>
-            <div style={{ marginBottom: '16px' }}>
-              <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '8px' }}>
-                Market Overview • {marketStatus}
-              </h2>
-              <p style={{ color: '#9CA3AF', marginBottom: '8px', fontSize: '14px' }}>
-                Real-time indices, futures, pre-market, and economic indicators
-              </p>
-              {marketData.lastUpdated && (
-                <p style={{ color: '#6B7280', fontSize: '12px', margin: 0 }}>
-                  Last Updated: {new Date(marketData.lastUpdated).toLocaleString()}
-                </p>
-              )}
-            </div>
+                {analysisData.marketEnvironment && (
+                  <div style={{
+                    backgroundColor: '#1a1a1a',
+                    borderRadius: '16px',
+                    padding: '20px',
+                    border: '1px solid #374151',
+                  }}>
+                    <h3 style={{ margin: '0 0 16px 0', color: '#10B981', fontSize: '18px' }}>
+                      🌍 Market Environment
+                    </h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+                      <div>
+                        <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#9CA3AF' }}>SESSION</p>
+                        <p style={{ margin: '0', fontWeight: 'bold' }}>{analysisData.marketEnvironment.session}</p>
+                      </div>
+                      <div>
+                        <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#9CA3AF' }}>VOLATILITY</p>
+                        <p style={{ margin: '0', fontWeight: 'bold' }}>{analysisData.marketEnvironment.volatility}</p>
+                      </div>
+                      <div>
+                        <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#9CA3AF' }}>SENTIMENT</p>
+                        <p style={{ margin: '0', fontWeight: 'bold' }}>{analysisData.marketEnvironment.sentiment}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
-            {isLoading.market && (
-              <div style={{ textAlign: 'center', padding: '40px 20px', color: '#9CA3AF' }}>
-                <p style={{ fontSize: '48px', margin: '0 0 16px 0' }}>🔄</p>
-                <p>Loading comprehensive 24/7 market data...</p>
-                <p style={{ fontSize: '14px', marginTop: '8px' }}>
-                  Including {marketStatus.toLowerCase()} session data, futures, and economic indicators
-                </p>
-              </div>
-            )}
+                {analysisData.technicalAnalysis && (
+                  <div style={{
+                    backgroundColor: '#1a1a1a',
+                    borderRadius: '16px',
+                    padding: '20px',
+                    border: '1px solid #374151',
+                  }}>
+                    <h3 style={{ margin: '0 0 16px 0', color: '#F59E0B', fontSize: '18px' }}>
+                      📈 Technical Analysis
+                    </h3>
+                    
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px', marginBottom: '16px' }}>
+                      <div style={{ backgroundColor: '#000000', borderRadius: '8px', padding: '12px' }}>
+                        <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#9CA3AF' }}>TREND</p>
+                        <p style={{ 
+                          margin: '0', 
+                          fontWeight: 'bold',
+                          color: analysisData.technicalAnalysis.trend === 'bullish' ? '#10B981' : 
+                                analysisData.technicalAnalysis.trend === 'bearish' ? '#EF4444' : '#9CA3AF'
+                        }}>
+                          {analysisData.technicalAnalysis.trend?.toUpperCase()}
+                        </p>
+                      </div>
+                      <div style={{ backgroundColor: '#000000', borderRadius: '8px', padding: '12px' }}>
+                        <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#9CA3AF' }}>STRENGTH</p>
+                        <p style={{ margin: '0', fontWeight: 'bold' }}>
+                          {analysisData.technicalAnalysis.strength?.toUpperCase()}
+                        </p>
+                      </div>
+                      {analysisData.technicalAnalysis.indicators?.rsi && (
+                        <div style={{ backgroundColor: '#000000', borderRadius: '8px', padding: '12px' }}>
+                          <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#9CA3AF' }}>RSI</p>
+                          <p style={{ margin: '0', fontWeight: 'bold' }}>
+                            {analysisData.technicalAnalysis.indicators.rsi.value} ({analysisData.technicalAnalysis.indicators.rsi.signal})
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
 
-            {!isLoading.market && marketData.error && (
-              <div style={{ textAlign: 'center', padding: '40px 20px', color: '#9CA3AF' }}>
-                <p style={{ fontSize: '48px', margin: '0 0 16px 0' }}>⚠️</p>
-                <p style={{ fontSize: '18px', margin: '0 0 8px 0' }}>Market Data Error</p>
-                <p style={{ fontSize: '14px', margin: '0', color: '#EF4444' }}>
-                  {marketData.error}
-                </p>
-                {marketData.details && (
-                  <p style={{ fontSize: '12px', marginTop: '8px', color: '#6B7280' }}>
-                    {marketData.details}
-                  </p>
+                {analysisData.recommendation && (
+                  <div style={{
+                    backgroundColor: '#1a1a1a',
+                    borderRadius: '16px',
+                    padding: '20px',
+                    border: '1px solid #374151',
+                  }}>
+                    <h3 style={{ margin: '0 0 16px 0', color: '#8B5CF6', fontSize: '18px' }}>
+                      🎯 Recommendation
+                    </h3>
+                    
+                    <div style={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between', 
+                      alignItems: 'center', 
+                      marginBottom: '16px',
+                      flexWrap: 'wrap',
+                      gap: '12px'
+                    }}>
+                      <p style={{ margin: '0', fontSize: '28px', fontWeight: 'bold', color: '#ffffff' }}>
+                        {analysisData.recommendation.action?.toUpperCase()}
+                      </p>
+                      {analysisData.recommendation.confidence && (
+                        <div style={{ textAlign: 'right' }}>
+                          <p style={{ margin: '0', fontSize: '20px', fontWeight: 'bold', color: '#ffffff' }}>
+                            {analysisData.recommendation.confidence}%
+                          </p>
+                          <p style={{ margin: '0', fontSize: '12px', color: '#E5E7EB' }}>Confidence</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {analysisData.recommendation.strategy && (
+                      <p style={{ margin: '0 0 12px 0', color: '#E5E7EB', fontSize: '16px' }}>
+                        <strong>Strategy:</strong> {analysisData.recommendation.strategy}
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
             )}
-
-            {!isLoading.market && !marketData.error && Object.keys(marketData).length > 3 && (
-              <div style={{
-                backgroundColor: '#1a1a1a',
-                borderRadius: '16px',
-                padding: '20px',
-                border: '1px solid #374151',
-              }}>
-                <h3 style={{ margin: '0 0 12px 0', color: '#3B82F6', fontSize: '18px' }}>
-                  📊 Market Data Results
-                </h3>
-                <pre style={{ 
-                  margin: 0, 
-                  lineHeight: 1.6, 
-                  fontSize: '14px',
-                  whiteSpace: 'pre-wrap',
-                  color: '#E5E7EB'
-                }}>
-                  {JSON.stringify(marketData, null, 2)}
-                </pre>
-              </div>
-            )}
-
-            {!isLoading.market && !marketData.error && Object.keys(marketData).length <= 3 && (
-              <div style={{ textAlign: 'center', padding: '40px 20px', color: '#9CA3AF' }}>
-                <p style={{ fontSize: '48px', margin: '0 0 16px 0' }}>📊</p>
-                <p>No real market data available</p>
-                <p style={{ fontSize: '14px', marginTop: '8px' }}>
-                  Check your market dashboard API configuration
-                </p>
-              </div>
-            )}
           </div>
         )}
 
-        {/* Smart Plays Tab */}
-        {activeTab === 'plays' && (
-          <div style={{ padding: '20px' }}>
-            <div style={{ marginBottom: '16px' }}>
-              <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '8px' }}>
-                Smart Plays • {marketStatus}
-              </h2>
-              <p style={{ color: '#9CA3AF', marginBottom: '8px', fontSize: '14px' }}>
-                Real-time opportunities from comprehensive market analysis
-              </p>
-            </div>
-            
-            {isLoading.plays && (
-              <div style={{ textAlign: 'center', padding: '40px 20px', color: '#9CA3AF' }}>
-                <p style={{ fontSize: '48px', margin: '0 0 16px 0' }}>🔄</p>
-                <p>Analyzing comprehensive market data for opportunities...</p>
-              </div>
-            )}
-
-            {!isLoading.plays && smartPlays.length === 0 && (
-              <div style={{ textAlign: 'center', padding: '40px 20px', color: '#9CA3AF' }}>
-                <p style={{ fontSize: '48px', margin: '0 0 16px 0' }}>🤖</p>
-                <p style={{ fontSize: '18px', margin: '0 0 8px 0' }}>No qualifying opportunities</p>
-                <p style={{ fontSize: '14px', margin: '0' }}>
-                  No significant moves detected in current {marketStatus.toLowerCase()} conditions
-                </p>
-              </div>
-            )}
-
-            {smartPlays.length > 0 && (
-              <div>
-                {smartPlays.map((play, idx) => (
-                  <div key={`${play.id}-${idx}`} style={{
-                    borderRadius: '16px',
-                    padding: '20px',
-                    marginBottom: '16px',
-                    border: '1px solid #374151',
-                    backgroundColor: '#1a1a1a'
-                  }}>
-                    <pre style={{ 
-                      margin: 0, 
-                      lineHeight: 1.6, 
-                      fontSize: '14px',
-                      whiteSpace: 'pre-wrap',
-                      color: '#E5E7EB'
-                    }}>
-                      {JSON.stringify(play, null, 2)}
-                    </pre>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Alerts Tab */}
-        {activeTab === 'alerts' && (
-          <div style={{ padding: '20px' }}>
-            <div style={{ marginBottom: '16px' }}>
-              <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '8px' }}>
-                Real-time Alerts • {marketStatus}
-              </h2>
-              <p style={{ color: '#9CA3AF', marginBottom: '8px', fontSize: '14px' }}>
-                Comprehensive market monitoring with AI analysis
-              </p>
-            </div>
-            
-            {isLoading.alerts && (
-              <div style={{ textAlign: 'center', padding: '40px 20px', color: '#9CA3AF' }}>
-                <p style={{ fontSize: '48px', margin: '0 0 16px 0' }}>🔄</p>
-                <p>Scanning comprehensive market data for alerts...</p>
-              </div>
-            )}
-
-            {!isLoading.alerts && alerts.length === 0 && (
-              <div style={{ textAlign: 'center', padding: '40px 20px', color: '#9CA3AF' }}>
-                <p style={{ fontSize: '48px', margin: '0 0 16px 0' }}>🔔</p>
-                <p style={{ fontSize: '18px', margin: '0 0 8px 0' }}>No active alerts</p>
-                <p style={{ fontSize: '14px', margin: '0' }}>
-                  No significant movements detected in current {marketStatus.toLowerCase()} conditions
-                </p>
-              </div>
-            )}
-
-            {alerts.length > 0 && (
-              <div>
-                {alerts.map((alert, idx) => (
-                  <div key={`${alert.id}-${idx}`} style={{
-                    borderRadius: '16px',
-                    padding: '20px',
-                    marginBottom: '16px',
-                    border: '1px solid #374151',
-                    backgroundColor: '#1a1a1a'
-                  }}>
-                    <pre style={{ 
-                      margin: 0, 
-                      lineHeight: 1.6, 
-                      fontSize: '14px',
-                      whiteSpace: 'pre-wrap',
-                      color: '#E5E7EB'
-                    }}>
-                      {JSON.stringify(alert, null, 2)}
-                    </pre>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Chat Tab */}
         {activeTab === 'chat' && (
           <div style={{
             display: 'flex',
@@ -1149,9 +962,320 @@ const RoloApp = () => {
             </div>
           </div>
         )}
+
+        {activeTab === 'plays' && (
+          <div style={{ padding: '20px' }}>
+            <div style={{ marginBottom: '16px' }}>
+              <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '8px' }}>
+                Smart Plays • {marketStatus}
+              </h2>
+              <p style={{ color: '#9CA3AF', marginBottom: '8px', fontSize: '14px' }}>
+                Real-time opportunities from comprehensive market analysis
+              </p>
+              {smartPlays.length > 0 && smartPlays[0].lastUpdated && (
+                <p style={{ color: '#6B7280', fontSize: '12px', margin: 0 }}>
+                  Generated: {new Date(smartPlays[0].lastUpdated).toLocaleString()}
+                </p>
+              )}
+            </div>
+            
+            {isLoading.plays && (
+              <div style={{ textAlign: 'center', padding: '40px 20px', color: '#9CA3AF' }}>
+                <p style={{ fontSize: '48px', margin: '0 0 16px 0' }}>🔄</p>
+                <p>Analyzing comprehensive market data for opportunities...</p>
+                <p style={{ fontSize: '14px', marginTop: '8px' }}>
+                  Including futures, pre-market, news, social sentiment, options flow
+                </p>
+              </div>
+            )}
+
+            {!isLoading.plays && smartPlays.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '40px 20px', color: '#9CA3AF' }}>
+                <p style={{ fontSize: '48px', margin: '0 0 16px 0' }}>🤖</p>
+                <p style={{ fontSize: '18px', margin: '0 0 8px 0' }}>No qualifying opportunities</p>
+                <p style={{ fontSize: '14px', margin: '0' }}>
+                  No significant moves detected in current {marketStatus.toLowerCase()} conditions
+                </p>
+              </div>
+            )}
+
+            {smartPlays.map((play, idx) => (
+              <div key={`${play.id}-${idx}`} style={{
+                borderRadius: '16px',
+                padding: '20px',
+                marginBottom: '16px',
+                border: '1px solid #374151',
+                background: play.confidence >= 85 ? 'linear-gradient(135deg, #064E3B, #065F46)' :
+                           play.confidence >= 70 ? 'linear-gradient(135deg, #1E3A8A, #1E40AF)' :
+                           'linear-gradient(135deg, #374151, #4B5563)'
+              }}>
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'flex-start', 
+                  marginBottom: '12px',
+                  flexWrap: 'wrap',
+                  gap: '8px'
+                }}>
+                  <div style={{ flex: 1 }}>
+                    <h3 style={{ fontSize: '18px', fontWeight: '600', margin: '0 0 4px 0', color: '#ffffff' }}>
+                      {play.emoji} {play.title}
+                    </h3>
+                    <p style={{ margin: '0', fontSize: '16px', fontWeight: 'bold', color: '#ffffff' }}>
+                      {play.ticker} • {play.strategy} • {play.timeframe}
+                    </p>
+                  </div>
+                  <span style={{
+                    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                    padding: '4px 12px',
+                    borderRadius: '12px',
+                    fontSize: '12px',
+                    color: '#ffffff',
+                    fontWeight: 'bold'
+                  }}>
+                    {play.confidence}% Confidence
+                  </span>
+                </div>
+
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', 
+                  gap: '12px',
+                  marginBottom: '16px',
+                  backgroundColor: 'rgba(0, 0, 0, 0.4)',
+                  padding: '16px',
+                  borderRadius: '12px'
+                }}>
+                  <div>
+                    <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#9CA3AF' }}>ENTRY</p>
+                    <p style={{ margin: '0', fontWeight: 'bold', color: '#10B981' }}>
+                      ${typeof play.entry === 'object' ? play.entry.price : play.entry}
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#9CA3AF' }}>STOP LOSS</p>
+                    <p style={{ margin: '0', fontWeight: 'bold', color: '#EF4444' }}>
+                      ${typeof play.stopLoss === 'object' ? play.stopLoss.price : play.stopLoss}
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#9CA3AF' }}>TARGET</p>
+                    <p style={{ margin: '0', fontWeight: 'bold', color: '#10B981' }}>
+                      ${play.targets && Array.isArray(play.targets) ? play.targets[0]?.price || play.targets[0] : play.targets}
+                    </p>
+                  </div>
+                </div>
+
+                {play.reasoning && (
+                  <p style={{ margin: '0', fontSize: '15px', color: '#E5E7EB', lineHeight: 1.4 }}>
+                    <strong>Analysis:</strong> {play.reasoning}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {activeTab === 'market' && (
+          <div style={{ padding: '20px' }}>
+            <div style={{ marginBottom: '16px' }}>
+              <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '8px' }}>
+                Market Overview • {marketStatus}
+              </h2>
+              <p style={{ color: '#9CA3AF', fontSize: '14px', marginBottom: '8px' }}>
+                Real-time indices, futures, economic indicators
+              </p>
+              {marketData.lastUpdated && (
+                <p style={{ color: '#6B7280', fontSize: '12px', margin: 0 }}>
+                  Last Updated: {new Date(marketData.lastUpdated).toLocaleString()}
+                </p>
+              )}
+            </div>
+            
+            {isLoading.market && (
+              <div style={{ textAlign: 'center', padding: '40px 20px', color: '#9CA3AF' }}>
+                <p style={{ fontSize: '48px', margin: '0 0 16px 0' }}>🔄</p>
+                <p>Loading comprehensive market data...</p>
+                <p style={{ fontSize: '14px', marginTop: '8px' }}>
+                  Including futures, pre-market, and economic indicators
+                </p>
+              </div>
+            )}
+
+            {!isLoading.market && (!marketData || Object.keys(marketData).length <= 2) && (
+              <div style={{ textAlign: 'center', padding: '40px 20px', color: '#9CA3AF' }}>
+                <p style={{ fontSize: '48px', margin: '0 0 16px 0' }}>📊</p>
+                <p>No real market data available</p>
+                <p style={{ fontSize: '14px', marginTop: '8px' }}>
+                  Check your market dashboard API configuration
+                </p>
+              </div>
+            )}
+
+            {marketData && Object.keys(marketData).length > 2 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                <div>
+                  <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '12px', color: '#3B82F6' }}>
+                    📈 Major Indices
+                  </h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {['sp500', 'nasdaq', 'dowJones'].map(index => {
+                      const data = marketData[index];
+                      if (!data || data.error) return null;
+                      
+                      return (
+                        <div key={index} style={{
+                          backgroundColor: '#1a1a1a',
+                          borderRadius: '16px',
+                          padding: '20px',
+                          border: '1px solid #1F2937',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center'
+                        }}>
+                          <div>
+                            <p style={{ fontWeight: '600', margin: '0', fontSize: '16px' }}>
+                              {data.symbol || index.toUpperCase()}
+                            </p>
+                            <p style={{ fontSize: '12px', color: '#9CA3AF', margin: '4px 0 0 0' }}>
+                              {marketStatus}
+                            </p>
+                          </div>
+                          <div style={{ textAlign: 'right' }}>
+                            <p style={{ fontSize: '20px', fontWeight: 'bold', margin: '0' }}>
+                              {data.price}
+                            </p>
+                            <p style={{ 
+                              fontSize: '14px', 
+                              color: data.change && parseFloat(data.change) >= 0 ? '#10B981' : '#EF4444',
+                              margin: '4px 0 0 0' 
+                            }}>
+                              {data.change} ({data.changePercent})
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'alerts' && (
+          <div style={{ padding: '20px' }}>
+            <div style={{ marginBottom: '16px' }}>
+              <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '8px' }}>
+                Real-time Alerts • {marketStatus}
+              </h2>
+              <p style={{ color: '#9CA3AF', marginBottom: '8px', fontSize: '14px' }}>
+                Comprehensive market monitoring with AI analysis
+              </p>
+              {alerts.length > 0 && alerts[0].timestamp && (
+                <p style={{ color: '#6B7280', fontSize: '12px', margin: 0 }}>
+                  Last Scan: {new Date(alerts[0].timestamp).toLocaleString()}
+                </p>
+              )}
+            </div>
+            
+            {isLoading.alerts && (
+              <div style={{ textAlign: 'center', padding: '40px 20px', color: '#9CA3AF' }}>
+                <p style={{ fontSize: '48px', margin: '0 0 16px 0' }}>🔄</p>
+                <p>Scanning comprehensive market data for alerts...</p>
+                <p style={{ fontSize: '14px', marginTop: '8px' }}>
+                  Monitoring breakouts, news, social sentiment, options flow
+                </p>
+              </div>
+            )}
+
+            {!isLoading.alerts && alerts.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '40px 20px', color: '#9CA3AF' }}>
+                <p style={{ fontSize: '48px', margin: '0 0 16px 0' }}>🔔</p>
+                <p style={{ fontSize: '18px', margin: '0 0 8px 0' }}>No active alerts</p>
+                <p style={{ fontSize: '14px', margin: '0' }}>
+                  No significant movements detected in current {marketStatus.toLowerCase()} conditions
+                </p>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {alerts.map((alert, idx) => (
+                <div 
+                  key={`${alert.id}-${idx}`} 
+                  style={{
+                    backgroundColor: alert.priority === 'high' ? 'rgba(239, 68, 68, 0.15)' :
+                                    alert.priority === 'medium' ? 'rgba(245, 158, 11, 0.15)' :
+                                    'rgba(16, 185, 129, 0.15)',
+                    border: `2px solid ${alert.priority === 'high' ? '#EF4444' :
+                                         alert.priority === 'medium' ? '#F59E0B' : '#10B981'}`,
+                    borderRadius: '16px',
+                    padding: '20px'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
+                    <span style={{ fontSize: '32px', flexShrink: 0 }}>
+                      {alert.type === 'breakout' ? '📈' :
+                       alert.type === 'breakdown' ? '📉' :
+                       alert.type === 'volume_spike' ? '📊' :
+                       alert.type === 'news' ? '📰' : '🔔'}
+                    </span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                        <h3 style={{ fontWeight: '700', margin: '0', fontSize: '18px', color: '#ffffff' }}>
+                          {alert.title}
+                          {alert.ticker && (
+                            <span style={{ 
+                              marginLeft: '8px', 
+                              fontSize: '14px', 
+                              fontWeight: '600',
+                              color: alert.priority === 'high' ? '#FCA5A5' :
+                                    alert.priority === 'medium' ? '#FCD34D' : '#A7F3D0'
+                            }}>
+                              {alert.ticker}
+                            </span>
+                          )}
+                        </h3>
+                        <span style={{
+                          fontSize: '11px',
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          backgroundColor: alert.priority === 'high' ? '#EF4444' :
+                                          alert.priority === 'medium' ? '#F59E0B' : '#10B981',
+                          color: '#ffffff',
+                          fontWeight: 'bold',
+                          textTransform: 'uppercase'
+                        }}>
+                          {alert.priority}
+                        </span>
+                      </div>
+                      
+                      <p style={{ fontSize: '15px', color: '#E5E7EB', margin: '0 0 12px 0', lineHeight: 1.5 }}>
+                        {alert.description}
+                      </p>
+                      
+                      {alert.action && (
+                        <div style={{ 
+                          backgroundColor: 'rgba(0, 0, 0, 0.3)', 
+                          borderRadius: '8px', 
+                          padding: '12px'
+                        }}>
+                          <p style={{ fontSize: '13px', margin: '0', color: '#ffffff' }}>
+                            <span style={{ fontWeight: '600' }}>💡 Action:</span> {alert.action}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Enhanced Bottom Navigation */}
       <div style={{
         position: 'fixed',
         bottom: 0,
@@ -1209,7 +1333,6 @@ const RoloApp = () => {
         </div>
       </div>
 
-      {/* CSS animations */}
       <style>
         {`
           @keyframes pulse {
