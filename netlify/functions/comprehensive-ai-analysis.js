@@ -223,21 +223,55 @@ exports.handler = async (event, context) => {
                 console.log(`[comprehensive-ai-analysis.js] ✅ Alpha Vantage News: ${alphaNewsData.feed.length} articles, sentiment: ${marketData.alphaVantageNews.sentiment?.label}`);
             }
 
-            // B. NewsAPI (Free tier available)
+            // B. NewsAPI (Free tier - NOW ACTIVE with your API key)
             try {
-                console.log(`[comprehensive-ai-analysis.js] Fetching NewsAPI data...`);
-                // NewsAPI free endpoint for business news
-                const newsApiUrl = `https://newsapi.org/v2/everything?q=${symbol || 'stock market'}&domains=cnbc.com,bloomberg.com,reuters.com,marketwatch.com&sortBy=publishedAt&language=en&pageSize=20&apiKey=${process.env.NEWSAPI_KEY || 'demo'}`;
-                const newsApiResponse = await fetch(newsApiUrl);
-                const newsApiData = await newsApiResponse.json();
+                console.log(`[comprehensive-ai-analysis.js] Fetching NewsAPI data with your API key...`);
+                const newsApiKey = process.env.NEWSAPI_KEY;
                 
-                if (newsApiData.articles && newsApiData.articles.length > 0) {
-                    marketData.newsApiData = {
-                        articles: newsApiData.articles.slice(0, 15),
-                        totalResults: newsApiData.totalResults,
-                        source: 'NewsAPI Free Tier'
-                    };
-                    console.log(`[comprehensive-ai-analysis.js] ✅ NewsAPI: ${newsApiData.articles.length} articles`);
+                if (newsApiKey && newsApiKey !== 'demo') {
+                    // Enhanced NewsAPI query with multiple searches for better coverage
+                    const queries = [
+                        `${symbol || 'stock market'} AND (earnings OR revenue OR profit)`,
+                        `${symbol || 'market'} AND (bullish OR bearish OR analyst)`,
+                        symbol ? `"${symbol}" stock` : 'stock market news'
+                    ];
+                    
+                    let allArticles = [];
+                    
+                    for (const query of queries) {
+                        try {
+                            const newsApiUrl = `https://newsapi.org/v2/everything?q=${encodeURIComponent(query)}&domains=cnbc.com,bloomberg.com,reuters.com,marketwatch.com,yahoo.com,benzinga.com&sortBy=publishedAt&language=en&pageSize=10&apiKey=${newsApiKey}`;
+                            const newsApiResponse = await fetch(newsApiUrl);
+                            const newsApiData = await newsApiResponse.json();
+                            
+                            if (newsApiData.articles && newsApiData.articles.length > 0) {
+                                allArticles = allArticles.concat(newsApiData.articles);
+                            }
+                            
+                            // Rate limiting delay
+                            await new Promise(resolve => setTimeout(resolve, 100));
+                        } catch (queryError) {
+                            console.warn(`[comprehensive-ai-analysis.js] NewsAPI query failed for: ${query}`, queryError.message);
+                        }
+                    }
+                    
+                    // Remove duplicates and sort by publication date
+                    const uniqueArticles = allArticles.filter((article, index, self) => 
+                        index === self.findIndex(a => a.url === article.url)
+                    ).sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
+                    
+                    if (uniqueArticles.length > 0) {
+                        marketData.newsApiData = {
+                            articles: uniqueArticles.slice(0, 20),
+                            totalResults: uniqueArticles.length,
+                            source: 'NewsAPI Premium Tier (YOUR KEY)',
+                            coverage: 'CNBC, Bloomberg, Reuters, MarketWatch, Yahoo Finance, Benzinga',
+                            queriesUsed: queries.length
+                        };
+                        console.log(`[comprehensive-ai-analysis.js] ✅ NewsAPI: ${uniqueArticles.length} unique articles from ${queries.length} queries`);
+                    }
+                } else {
+                    console.warn(`[comprehensive-ai-analysis.js] NewsAPI key not found in environment variables`);
                 }
             } catch (e) {
                 console.warn(`[comprehensive-ai-analysis.js] NewsAPI failed:`, e.message);
@@ -430,34 +464,105 @@ exports.handler = async (event, context) => {
                 console.log(`[comprehensive-ai-analysis.js] ✅ StockTwits sentiment already captured`);
             }
 
-            // B. Reddit Sentiment (Free via Reddit API)
+            // B. Reddit Sentiment (NOW ACTIVE with your API key)
             try {
-                console.log(`[comprehensive-ai-analysis.js] Fetching Reddit sentiment for ${symbol || 'markets'}...`);
-                const redditSearchUrl = `https://www.reddit.com/r/investing+stocks+SecurityAnalysis+ValueInvesting+StockMarket/search.json?q=${symbol || 'stock market'}&sort=new&limit=25&t=day`;
-                const redditResponse = await fetch(redditSearchUrl, {
-                    headers: { 'User-Agent': 'RoloTradingBot/1.0' }
-                });
-                const redditData = await redditResponse.json();
+                console.log(`[comprehensive-ai-analysis.js] Fetching Reddit sentiment with your API key for ${symbol || 'markets'}...`);
+                const redditApiKey = process.env.REDDIT_API_KEY;
                 
-                if (redditData.data && redditData.data.children) {
-                    const posts = redditData.data.children.slice(0, 15);
-                    marketData.redditSentiment = {
-                        symbol: symbol || 'market',
-                        totalPosts: posts.length,
-                        posts: posts.map(post => ({
-                            title: post.data.title,
-                            score: post.data.score,
-                            comments: post.data.num_comments,
-                            subreddit: post.data.subreddit,
-                            created: new Date(post.data.created_utc * 1000).toISOString(),
-                            url: `https://reddit.com${post.data.permalink}`
-                        })),
-                        averageScore: posts.reduce((sum, post) => sum + post.data.score, 0) / posts.length,
-                        totalComments: posts.reduce((sum, post) => sum + post.data.num_comments, 0),
-                        source: 'Reddit Free API',
-                        subreddits: ['investing', 'stocks', 'SecurityAnalysis', 'ValueInvesting', 'StockMarket']
-                    };
-                    console.log(`[comprehensive-ai-analysis.js] ✅ Reddit: ${posts.length} posts, avg score: ${marketData.redditSentiment.averageScore.toFixed(1)}`);
+                if (redditApiKey) {
+                    // Enhanced Reddit API with authentication for better access
+                    const subreddits = ['investing', 'stocks', 'SecurityAnalysis', 'ValueInvesting', 'StockMarket', 'wallstreetbets', 'options', 'dividends'];
+                    let allPosts = [];
+                    
+                    for (const subreddit of subreddits) {
+                        try {
+                            const redditUrl = `https://oauth.reddit.com/r/${subreddit}/search?q=${symbol || 'stock market'}&sort=new&limit=10&t=day`;
+                            const redditResponse = await fetch(redditUrl, {
+                                headers: { 
+                                    'Authorization': `Bearer ${redditApiKey}`,
+                                    'User-Agent': 'RoloTradingBot/1.0'
+                                }
+                            });
+                            const redditData = await redditResponse.json();
+                            
+                            if (redditData.data && redditData.data.children) {
+                                const posts = redditData.data.children.map(post => ({
+                                    ...post.data,
+                                    subreddit_name: subreddit
+                                }));
+                                allPosts = allPosts.concat(posts);
+                            }
+                            
+                            // Rate limiting delay
+                            await new Promise(resolve => setTimeout(resolve, 200));
+                        } catch (subredditError) {
+                            console.warn(`[comprehensive-ai-analysis.js] Reddit subreddit ${subreddit} failed:`, subredditError.message);
+                        }
+                    }
+                    
+                    if (allPosts.length > 0) {
+                        // Sort by score and recency
+                        allPosts.sort((a, b) => {
+                            const scoreWeight = 0.7;
+                            const timeWeight = 0.3;
+                            const aScore = (a.score * scoreWeight) + (a.created_utc * timeWeight);
+                            const bScore = (b.score * scoreWeight) + (b.created_utc * timeWeight);
+                            return bScore - aScore;
+                        });
+                        
+                        marketData.redditSentiment = {
+                            symbol: symbol || 'market',
+                            totalPosts: allPosts.length,
+                            subredditsSearched: subreddits,
+                            posts: allPosts.slice(0, 20).map(post => ({
+                                title: post.title,
+                                score: post.score,
+                                comments: post.num_comments,
+                                subreddit: post.subreddit_name,
+                                created: new Date(post.created_utc * 1000).toISOString(),
+                                url: `https://reddit.com${post.permalink}`,
+                                upvoteRatio: post.upvote_ratio,
+                                awards: post.total_awards_received
+                            })),
+                            averageScore: allPosts.reduce((sum, post) => sum + post.score, 0) / allPosts.length,
+                            totalComments: allPosts.reduce((sum, post) => sum + post.num_comments, 0),
+                            averageUpvoteRatio: allPosts.reduce((sum, post) => sum + (post.upvote_ratio || 0.5), 0) / allPosts.length,
+                            sentiment: allPosts.reduce((sum, post) => sum + (post.upvote_ratio || 0.5), 0) / allPosts.length > 0.6 ? 'Bullish' : 
+                                      allPosts.reduce((sum, post) => sum + (post.upvote_ratio || 0.5), 0) / allPosts.length < 0.4 ? 'Bearish' : 'Neutral',
+                            source: 'Reddit API Premium (YOUR KEY)',
+                            coverage: subreddits.join(', ')
+                        };
+                        console.log(`[comprehensive-ai-analysis.js] ✅ Reddit: ${allPosts.length} posts across ${subreddits.length} subreddits, sentiment: ${marketData.redditSentiment.sentiment}`);
+                    }
+                } else {
+                    // Fallback to free Reddit API (no auth)
+                    console.log(`[comprehensive-ai-analysis.js] Using free Reddit API (no auth)...`);
+                    const redditSearchUrl = `https://www.reddit.com/r/investing+stocks+SecurityAnalysis+ValueInvesting+StockMarket/search.json?q=${symbol || 'stock market'}&sort=new&limit=25&t=day`;
+                    const redditResponse = await fetch(redditSearchUrl, {
+                        headers: { 'User-Agent': 'RoloTradingBot/1.0' }
+                    });
+                    const redditData = await redditResponse.json();
+                    
+                    if (redditData.data && redditData.data.children) {
+                        const posts = redditData.data.children.slice(0, 15);
+                        marketData.redditSentiment = {
+                            symbol: symbol || 'market',
+                            totalPosts: posts.length,
+                            posts: posts.map(post => ({
+                                title: post.data.title,
+                                score: post.data.score,
+                                comments: post.data.num_comments,
+                                subreddit: post.data.subreddit,
+                                created: new Date(post.data.created_utc * 1000).toISOString(),
+                                url: `https://reddit.com${post.data.permalink}`
+                            })),
+                            averageScore: posts.reduce((sum, post) => sum + post.data.score, 0) / posts.length,
+                            totalComments: posts.reduce((sum, post) => sum + post.data.num_comments, 0),
+                            source: 'Reddit Free API (No Auth)',
+                            subreddits: ['investing', 'stocks', 'SecurityAnalysis', 'ValueInvesting', 'StockMarket']
+                        };
+                        console.log(`[comprehensive-ai-analysis.js] ✅ Reddit Free: ${posts.length} posts, avg score: ${marketData.redditSentiment.averageScore.toFixed(1)}`);
+                    }
                 }
             } catch (e) {
                 console.warn(`[comprehensive-ai-analysis.js] Reddit failed:`, e.message);
