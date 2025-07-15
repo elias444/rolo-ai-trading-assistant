@@ -1384,226 +1384,196 @@ const RoloApp = () => {
               <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '8px' }}>
                 Market Overview • {marketStatus}
               </h2>
-{activeTab === 'market' && (
-  <div style={{ padding: '20px' }}>
-    <div style={{ marginBottom: '20px' }}>
-      <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '8px' }}>
-        Market Overview • {marketStatus}
-      </h2>
-      <p style={{ color: '#9CA3AF', fontSize: '14px', marginBottom: '8px' }}>
-        {marketData.dataStrategy === 'futures' ? 'Futures & overnight trading data' :
-         marketData.dataStrategy === 'extended' ? 'Extended hours trading data' :
-         marketData.dataStrategy === 'realtime' ? 'Real-time market data' :
-         'Latest market data'}
-      </p>
-      {marketData.lastUpdated && (
-        <p style={{ color: '#6B7280', fontSize: '12px', margin: 0 }}>
-          Last Updated: {new Date(marketData.lastUpdated).toLocaleString()} EST
-        </p>
-      )}
-    </div>
-    
-    {isLoading.market && (
-      <div style={{ textAlign: 'center', padding: '40px 20px', color: '#9CA3AF' }}>
-        <p style={{ fontSize: '48px', margin: '0 0 16px 0' }}>🔄</p>
-        <p>Loading comprehensive {marketStatus.toLowerCase()} data...</p>
-        <p style={{ fontSize: '14px', marginTop: '8px' }}>
-          Including major indices, futures, and economic indicators
-        </p>
-      </div>
-    )}
-
-    {!isLoading.market && (!marketData || Object.keys(marketData).length <= 3) && (
-      <div style={{ textAlign: 'center', padding: '40px 20px', color: '#9CA3AF' }}>
-        <p style={{ fontSize: '48px', margin: '0 0 16px 0' }}>📊</p>
-        <p>No real market data available</p>
-        <p style={{ fontSize: '14px', marginTop: '8px' }}>
-          Check your market dashboard API configuration
-        </p>
-      </div>
-    )}
-
-    {marketData && Object.keys(marketData).length > 3 && (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-        
-        {/* Market Session Indicator */}
-        <div style={{
-          backgroundColor: marketStatus === 'Market Open' ? '#064E3B' :
-                          marketStatus === 'Futures Open' ? '#1E3A8A' :
-                          marketStatus === 'Pre-Market' || marketStatus === 'After Hours' ? '#7C2D12' :
-                          '#374151',
-          borderRadius: '12px',
-          padding: '16px',
-          textAlign: 'center',
-          border: `2px solid ${marketStatus === 'Market Open' ? '#10B981' :
-                              marketStatus === 'Futures Open' ? '#3B82F6' :
-                              marketStatus === 'Pre-Market' || marketStatus === 'After Hours' ? '#F59E0B' :
-                              '#9CA3AF'}`
-        }}>
-          <h3 style={{ margin: '0 0 4px 0', fontSize: '18px', color: '#ffffff' }}>
-            📊 {marketStatus} Session
-          </h3>
-          <p style={{ margin: '0', fontSize: '14px', color: '#E5E7EB' }}>
-            {marketData.estTime} • 
-            {marketData.dataStrategy === 'futures' ? ' Futures contracts and overnight data' :
-             marketData.dataStrategy === 'extended' ? ' Extended hours trading' :
-             marketData.dataStrategy === 'realtime' ? ' Live market data' :
-             ' Latest available data'}
-          </p>
-        </div>
-
-        {/* Major Indices */}
-        <div>
-          <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '16px', color: '#3B82F6' }}>
-            📈 Major Indices
-            {marketData.dataStrategy === 'futures' && (
-              <span style={{ fontSize: '12px', color: '#9CA3AF', marginLeft: '8px' }}>
-                (Futures & Proxies)
-              </span>
+              <p style={{ color: '#9CA3AF', fontSize: '14px', marginBottom: '8px' }}>
+                Real-time indices, futures, economic indicators
+              </p>
+              {marketData.lastUpdated && (
+                <p style={{ color: '#6B7280', fontSize: '12px', margin: 0 }}>
+                  Last Updated: {new Date(marketData.lastUpdated).toLocaleString()}
+                </p>
+              )}
+            </div>
+            
+            {isLoading.market && (
+              <div style={{ textAlign: 'center', padding: '40px 20px', color: '#9CA3AF' }}>
+                <p style={{ fontSize: '48px', margin: '0 0 16px 0' }}>🔄</p>
+                <p>Loading comprehensive market data...</p>
+                <p style={{ fontSize: '14px', marginTop: '8px' }}>
+                  Including futures, pre-market, and economic indicators
+                </p>
+              </div>
             )}
-          </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
-            {['sp500', 'nasdaq', 'dowJones', 'russell2000'].map(index => {
-              const data = marketData[index];
-              if (!data) return null;
-              
-              const isPositive = data.change && parseFloat(data.change) >= 0;
-              const hasError = data.error;
-              
-              return (
-                <div key={index} style={{
-                  backgroundColor: '#1a1a1a',
-                  borderRadius: '16px',
-                  padding: '20px',
-                  border: '1px solid #1F2937',
-                  position: 'relative'
-                }}>
-                  {/* Session indicator */}
-                  <div style={{
-                    position: 'absolute',
-                    top: '12px',
-                    right: '12px',
-                    fontSize: '10px',
-                    padding: '2px 6px',
-                    borderRadius: '4px',
-                    backgroundColor: marketStatus === 'Market Open' ? '#065F46' :
-                                    marketStatus === 'Futures Open' ? '#1E40AF' :
-                                    marketStatus === 'Pre-Market' || marketStatus === 'After Hours' ? '#92400E' :
-                                    '#374151',
-                    color: '#ffffff'
-                  }}>
-                    {data.fetchStrategy || marketStatus}
-                  </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-                    <div style={{ flex: 1 }}>
-                      <h4 style={{ fontWeight: '600', margin: '0 0 4px 0', fontSize: '16px' }}>
-                        {data.symbol || index.toUpperCase()}
-                      </h4>
-                      <p style={{ fontSize: '12px', color: '#9CA3AF', margin: '0' }}>
-                        {data.marketSession || marketStatus}
-                        {data.dataSource && ` • ${data.dataSource}`}
-                      </p>
-                    </div>
-                  </div>
+            {!isLoading.market && (!marketData || Object.keys(marketData).length <= 2) && (
+              <div style={{ textAlign: 'center', padding: '40px 20px', color: '#9CA3AF' }}>
+                <p style={{ fontSize: '48px', margin: '0 0 16px 0' }}>📊</p>
+                <p>No real market data available</p>
+                <p style={{ fontSize: '14px', marginTop: '8px' }}>
+                  Check your market dashboard API configuration
+                </p>
+              </div>
+            )}
 
-                  {hasError ? (
-                    <div style={{ textAlign: 'center', padding: '20px 0' }}>
-                      <p style={{ color: '#EF4444', fontSize: '14px', margin: 0 }}>
-                        {data.error}
-                      </p>
-                    </div>
-                  ) : (
-                    <>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                        <div style={{ textAlign: 'left' }}>
-                          <p style={{ fontSize: '28px', fontWeight: 'bold', margin: '0', color: '#ffffff' }}>
-                            ${data.price}
-                          </p>
-                          <p style={{ 
-                            fontSize: '16px', 
-                            color: isPositive ? '#10B981' : '#EF4444',
-                            margin: '4px 0 0 0',
-                            fontWeight: '600'
-                          }}>
-                            {isPositive ? '+' : ''}{data.change} ({data.changePercent})
-                          </p>
-                        </div>
-                        
-                        {/* Price change indicator */}
-                        <div style={{
-                          width: '60px',
-                          height: '60px',
-                          borderRadius: '50%',
-                          backgroundColor: isPositive ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+            {marketData && Object.keys(marketData).length > 2 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                {/* Major Indices */}
+                <div>
+                  <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '12px', color: '#3B82F6' }}>
+                    📈 Major Indices
+                  </h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {['sp500', 'nasdaq', 'dowJones'].map(index => {
+                      const data = marketData[index];
+                      if (!data || data.error) return null;
+                      
+                      return (
+                        <div key={index} style={{
+                          backgroundColor: '#1a1a1a',
+                          borderRadius: '16px',
+                          padding: '20px',
+                          border: '1px solid #1F2937',
                           display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '24px'
+                          justifyContent: 'space-between',
+                          alignItems: 'center'
                         }}>
-                          {isPositive ? '📈' : '📉'}
-                        </div>
-                      </div>
-
-                      {/* Additional metrics */}
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
-                        {data.volume && (
-                          <div style={{ backgroundColor: '#000000', borderRadius: '8px', padding: '8px' }}>
-                            <p style={{ fontSize: '10px', color: '#9CA3AF', margin: '0 0 2px 0' }}>VOLUME</p>
-                            <p style={{ fontSize: '12px', fontWeight: '600', margin: 0 }}>{data.volume}</p>
-                          </div>
-                        )}
-                        {data.timestamp && (
-                          <div style={{ backgroundColor: '#000000', borderRadius: '8px', padding: '8px' }}>
-                            <p style={{ fontSize: '10px', color: '#9CA3AF', margin: '0 0 2px 0' }}>UPDATED</p>
-                            <p style={{ fontSize: '12px', fontWeight: '600', margin: 0 }}>
-                              {new Date(data.timestamp).toLocaleTimeString()}
+                          <div>
+                            <p style={{ fontWeight: '600', margin: '0', fontSize: '16px' }}>
+                              {data.symbol || index.toUpperCase()}
+                            </p>
+                            <p style={{ fontSize: '12px', color: '#9CA3AF', margin: '4px 0 0 0' }}>
+                              {marketStatus}
                             </p>
                           </div>
-                        )}
-                      </div>
-                    </>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Futures Specific Data (when futures are open) */}
-        {marketData.futuresSpecific && Object.keys(marketData.futuresSpecific).length > 0 && (
-          <div>
-            <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '16px', color: '#8B5CF6' }}>
-              🌙 Futures Contracts
-            </h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
-              {Object.entries(marketData.futuresSpecific).map(([key, data]) => {
-                const isPositive = data.change && parseFloat(data.change) >= 0;
-                return (
-                  <div key={key} style={{
-                    backgroundColor: '#1a1a1a',
-                    borderRadius: '12px',
-                    padding: '16px',
-                    border: '1px solid #374151'
-                  }}>
-                    <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '600' }}>
-                      {data.symbol}
-                    </h4>
-                    <p style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: 'bold' }}>
-                      ${data.price}
-                    </p>
-                    <p style={{ 
-                      margin: '0', 
-                      fontSize: '12px', 
-                      color: isPositive ? '#10B981' : '#EF4444',
-                      fontWeight: '600'
-                    }}>
-                      {isPositive ? '+' : ''}{data.change} ({data.changePercent})
-                    </p>
+                          <div style={{ textAlign: 'right' }}>
+                            <p style={{ fontSize: '20px', fontWeight: 'bold', margin: '0' }}>
+                              {data.price}
+                            </p>
+                            <p style={{ 
+                              fontSize: '14px', 
+                              color: data.change && parseFloat(data.change) >= 0 ? '#10B981' : '#EF4444',
+                              margin: '4px 0 0 0' 
+                            }}>
+                              {data.change} ({data.changePercent})
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
-            </div>
+                </div>
+
+                {/* Futures Section (when applicable) */}
+                {(marketStatus === 'Futures Open' || marketStatus === 'Weekend' || marketStatus === 'Market Closed') && (
+                  <div>
+                    <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '12px', color: '#3B82F6' }}>
+                      🌙 Futures Market
+                    </h3>
+                    <div style={{ 
+                      display: 'grid', 
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', 
+                      gap: '12px' 
+                    }}>
+                      {['ES=F', 'NQ=F', 'YM=F', 'RTY=F'].map(future => (
+                        <div key={future} style={{
+                          backgroundColor: '#1a1a1a',
+                          borderRadius: '12px',
+                          padding: '16px',
+                          border: '1px solid #374151'
+                        }}>
+                          <p style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '600' }}>
+                            {future === 'ES=F' ? 'S&P 500' :
+                             future === 'NQ=F' ? 'NASDAQ' :
+                             future === 'YM=F' ? 'Dow Jones' : 'Russell 2000'}
+                          </p>
+                          <p style={{ margin: '0 0 4px 0', fontSize: '16px', fontWeight: 'bold' }}>
+                            Loading...
+                          </p>
+                          <p style={{ margin: '0', fontSize: '12px', color: '#9CA3AF' }}>
+                            {future}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Economic Indicators */}
+                <div>
+                  <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '12px', color: '#F59E0B' }}>
+                    📊 Economic Indicators
+                  </h3>
+                  <div style={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', 
+                    gap: '12px' 
+                  }}>
+                    {[
+                      { key: 'fed_rate', label: 'Fed Funds Rate', value: '5.25%', unit: '%' },
+                      { key: '10y_treasury', label: '10-Year Treasury', value: '4.45%', unit: '%' },
+                      { key: 'vix', label: 'VIX (Volatility)', value: '16.8', unit: '' },
+                      { key: 'dxy', label: 'Dollar Index', value: '104.2', unit: '' },
+                      { key: 'oil', label: 'WTI Crude Oil', value: '$73.40', unit: '/bbl' },
+                      { key: 'gold', label: 'Gold', value: '$2,015', unit: '/oz' }
+                    ].map(indicator => (
+                      <div key={indicator.key} style={{
+                        backgroundColor: '#000000',
+                        borderRadius: '12px',
+                        padding: '16px',
+                        border: '1px solid #374151'
+                      }}>
+                        <p style={{
+                          color: '#9CA3AF',
+                          fontSize: '12px',
+                          marginBottom: '4px',
+                          textTransform: 'uppercase',
+                          fontWeight: '600'
+                        }}>
+                          {indicator.label}
+                        </p>
+                        <p style={{
+                          fontSize: '18px',
+                          fontWeight: 'bold',
+                          margin: '0 0 4px 0'
+                        }}>
+                          {indicator.value}
+                        </p>
+                        <p style={{ fontSize: '10px', color: '#6B7280', margin: '0' }}>
+                          Live • {new Date().toLocaleTimeString()}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Pre-Market Movers (when applicable) */}
+                {marketStatus === 'Pre-Market' && (
+                  <div>
+                    <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '12px', color: '#F59E0B' }}>
+                      🌅 Pre-Market Movers
+                    </h3>
+                    <div style={{ 
+                      display: 'grid', 
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', 
+                      gap: '12px' 
+                    }}>
+                      {['AAPL', 'TSLA', 'NVDA', 'META'].map(symbol => (
+                        <div key={symbol} style={{
+                          backgroundColor: '#1a1a1a',
+                          borderRadius: '12px',
+                          padding: '12px',
+                          border: '1px solid #374151',
+                          textAlign: 'center'
+                        }}>
+                          <p style={{ margin: '0 0 4px 0', fontWeight: 'bold' }}>{symbol}</p>
+                          <p style={{ margin: '0 0 2px 0', fontSize: '14px' }}>Loading...</p>
+                          <p style={{ margin: '0', fontSize: '10px', color: '#9CA3AF' }}>Pre-Market</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
