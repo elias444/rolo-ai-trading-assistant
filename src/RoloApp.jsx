@@ -93,6 +93,7 @@ const App = () => {
     const chatContainerRef = useRef(null);
 
     // Access API keys from environment variables (Vite-specific)
+    // These will be replaced by Netlify's environment variables during the build.
     const ALPHA_VANTAGE_API_KEY = import.meta.env.VITE_ALPHA_VANTAGE_API_KEY;
     const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
