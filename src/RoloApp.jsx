@@ -950,3 +950,4 @@ const App = () => {
 
         // Export the App component as default for standard React build tools
         export default App;
+
