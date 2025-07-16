@@ -142,8 +142,12 @@
             const chatContainerRef = useRef(null);
 
             // API keys are provided by the Canvas environment for the fetch calls
-            const ALPHA_VANTAGE_API_KEY = '';
-            const GEMINI_API_KEY = '';
+            // For local testing in this self-contained HTML, we use empty strings.
+            // For Netlify deployment with a build tool like Vite, you would typically
+            // access environment variables like: process.env.VITE_ALPHA_VANTAGE_API_KEY
+            // or import.meta.env.VITE_ALPHA_VANTAGE_API_KEY if using Vite.
+            const ALPHA_VANTAGE_API_KEY = ''; // Replace with your actual Alpha Vantage API Key for testing
+            const GEMINI_API_KEY = ''; // Replace with your actual Gemini API Key for testing
 
             // --- Data Fetching Functions ---
             const fetchStockQuote = useCallback(async (symbol) => {
