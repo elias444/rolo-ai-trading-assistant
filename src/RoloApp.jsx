@@ -322,6 +322,7 @@ const RoloApp = () => {
     setChatInput('');
     
     try {
+      console.log('Sending chat message with full context...');
       const contextData = {
         selectedStock,
         marketStatus,
@@ -331,6 +332,7 @@ const RoloApp = () => {
         analysisData,
         smartPlaysCount: smartPlays.length,
         alertsCount: alerts.length,
+        popularStocks,
         timestamp: new Date().toISOString()
       };
       
@@ -341,21 +343,25 @@ const RoloApp = () => {
           type: 'chat',
           message: message,
           context: contextData,
+          symbol: selectedStock,
           marketSession: marketStatus
         }),
       });
       
       if (response.ok) {
         const data = await response.json();
-        const aiResponse = data.analysis?.response || data.response || 'I apologize, but I encountered an issue accessing the latest market data. Please try again.';
+        const aiResponse = data.analysis?.response || data.response || 'I have access to real-time market data, but encountered a processing issue. Let me try to help you with your question about the markets.';
         setChatMessages(prev => [...prev, { role: 'ai', content: aiResponse }]);
       } else {
-        setChatMessages(prev => [...prev, { role: 'ai', content: 'I apologize, but I am having trouble accessing the latest market data right now. Please try again in a moment.' }]);
+        const errorText = await response.text();
+        console.error('Chat failed:', response.status, errorText);
+        setChatMessages(prev => [...prev, { role: 'ai', content: `I'm having trouble accessing some market data services right now (HTTP ${response.status}). However, I can still help with general market questions. What would you like to know?` }]);
       }
     } catch (error) {
-      setChatMessages(prev => [...prev, { role: 'ai', content: 'I apologize, but I am experiencing technical difficulties. Please try again.' }]);
+      console.error('Chat error:', error);
+      setChatMessages(prev => [...prev, { role: 'ai', content: 'I\'m experiencing a technical issue with my data connections. Please try your question again, and I\'ll do my best to help with the available information.' }]);
     }
-  }, [chatInput, selectedStock, marketStatus, activeTab, stockData, marketData, analysisData, smartPlays.length, alerts.length]);
+  }, [chatInput, selectedStock, marketStatus, activeTab, stockData, marketData, analysisData, smartPlays.length, alerts.length, popularStocks]);
 
   const handleEditStocks = useCallback(() => {
     setIsEditingStocks(!isEditingStocks);
@@ -770,7 +776,7 @@ const RoloApp = () => {
                       { label: 'VOLUME', value: stockData[selectedStock].volume || 'N/A' },
                       { label: 'HIGH', value: stockData[selectedStock].high ? `$${stockData[selectedStock].high}` : 'N/A' },
                       { label: 'LOW', value: stockData[selectedStock].low ? `$${stockData[selectedStock].low}` : 'N/A' },
-                      { label: 'OPEN', value: stockData[selectedStock].open ? `$${stockData[selectedStock].open}` : 'N/A' }
+                      { label: 'OPEN', value: stockData[selectedStock].open ? `${stockData[selectedStock].open}` : 'N/A' }
                     ].map(metric => (
                       <div key={metric.label} style={{
                         backgroundColor: '#000000',
@@ -1031,14 +1037,22 @@ const RoloApp = () => {
                 Market Overview • {marketStatus}
               </h2>
               <p style={{ color: '#9CA3AF', fontSize: '14px', marginBottom: '8px' }}>
-                Real-time indices, futures, bonds, and economic indicators
+                Real-time indices, futures, pre-market, bonds, and economic indicators
               </p>
+              {marketData.lastUpdated && (
+                <p style={{ color: '#6B7280', fontSize: '12px', margin: 0 }}>
+                  Last Updated: {new Date(marketData.lastUpdated).toLocaleString()}
+                </p>
+              )}
             </div>
             
             {isLoading.market && (
               <div style={{ textAlign: 'center', padding: '40px 20px', color: '#9CA3AF' }}>
                 <p style={{ fontSize: '48px', margin: '0 0 16px 0' }}>🔄</p>
                 <p>Loading comprehensive market data...</p>
+                <p style={{ fontSize: '14px', marginTop: '8px' }}>
+                  Including futures, pre-market, bonds, treasury yields, VIX, commodities
+                </p>
               </div>
             )}
 
@@ -1047,7 +1061,7 @@ const RoloApp = () => {
                 <p style={{ fontSize: '48px', margin: '0 0 16px 0' }}>📊</p>
                 <p>No real market data available</p>
                 <p style={{ fontSize: '14px', marginTop: '8px' }}>
-                  Check your market dashboard API configuration
+                  Check your market-dashboard function configuration
                 </p>
               </div>
             )}
@@ -1056,46 +1070,142 @@ const RoloApp = () => {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                 <div>
                   <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '12px', color: '#3B82F6' }}>
-                    📈 Major Indices
+                    📊 Major Indices {marketStatus !== 'Market Open' && `(${marketStatus})`}
                   </h3>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {['sp500', 'nasdaq', 'dowJones'].map(index => {
-                      const data = marketData[index];
-                      if (!data || data.error) return null;
-                      
-                      return (
-                        <div key={index} style={{
-                          backgroundColor: '#1a1a1a',
-                          borderRadius: '16px',
-                          padding: '20px',
-                          border: '1px solid #1F2937',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center'
-                        }}>
-                          <div>
-                            <p style={{ fontWeight: '600', margin: '0', fontSize: '16px' }}>
-                              {data.name || index}
-                            </p>
-                            <p style={{ fontSize: '12px', color: '#9CA3AF', margin: '4px 0 0 0' }}>
-                              {marketStatus}
-                            </p>
-                          </div>
-                          <div style={{ textAlign: 'right' }}>
-                            <p style={{ fontSize: '20px', fontWeight: 'bold', margin: '0' }}>
-                              {data.price || 'N/A'}
-                            </p>
-                            <p style={{ 
-                              fontSize: '14px', 
-                              color: '#10B981',
-                              margin: '4px 0 0 0' 
-                            }}>
-                              {data.change || 'N/A'}
-                            </p>
-                          </div>
+                    {marketData.sp500 && (
+                      <div style={{
+                        backgroundColor: '#1a1a1a',
+                        borderRadius: '16px',
+                        padding: '20px',
+                        border: '1px solid #1F2937',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center'
+                      }}>
+                        <div>
+                          <p style={{ fontWeight: '600', margin: '0', fontSize: '16px' }}>
+                            S&P 500 Index
+                          </p>
+                          <p style={{ fontSize: '12px', color: '#9CA3AF', margin: '4px 0 0 0' }}>
+                            {marketData.sp500.dataSource || 'SPX'} • {marketStatus}
+                          </p>
                         </div>
-                      );
-                    })}
+                        <div style={{ textAlign: 'right' }}>
+                          <p style={{ fontSize: '20px', fontWeight: 'bold', margin: '0' }}>
+                            {marketData.sp500.price || 'N/A'}
+                          </p>
+                          <p style={{ 
+                            fontSize: '14px', 
+                            color: marketData.sp500.change && parseFloat(marketData.sp500.change.replace('%', '')) >= 0 ? '#10B981' : '#EF4444',
+                            margin: '4px 0 0 0' 
+                          }}>
+                            {marketData.sp500.change || 'N/A'} {marketData.sp500.changePercent && `(${marketData.sp500.changePercent})`}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {marketData.nasdaq && (
+                      <div style={{
+                        backgroundColor: '#1a1a1a',
+                        borderRadius: '16px',
+                        padding: '20px',
+                        border: '1px solid #1F2937',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center'
+                      }}>
+                        <div>
+                          <p style={{ fontWeight: '600', margin: '0', fontSize: '16px' }}>
+                            NASDAQ Composite
+                          </p>
+                          <p style={{ fontSize: '12px', color: '#9CA3AF', margin: '4px 0 0 0' }}>
+                            {marketData.nasdaq.dataSource || 'IXIC'} • {marketStatus}
+                          </p>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <p style={{ fontSize: '20px', fontWeight: 'bold', margin: '0' }}>
+                            {marketData.nasdaq.price || 'N/A'}
+                          </p>
+                          <p style={{ 
+                            fontSize: '14px', 
+                            color: marketData.nasdaq.change && parseFloat(marketData.nasdaq.change.replace('%', '')) >= 0 ? '#10B981' : '#EF4444',
+                            margin: '4px 0 0 0' 
+                          }}>
+                            {marketData.nasdaq.change || 'N/A'} {marketData.nasdaq.changePercent && `(${marketData.nasdaq.changePercent})`}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {marketData.dowJones && (
+                      <div style={{
+                        backgroundColor: '#1a1a1a',
+                        borderRadius: '16px',
+                        padding: '20px',
+                        border: '1px solid #1F2937',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center'
+                      }}>
+                        <div>
+                          <p style={{ fontWeight: '600', margin: '0', fontSize: '16px' }}>
+                            Dow Jones Industrial
+                          </p>
+                          <p style={{ fontSize: '12px', color: '#9CA3AF', margin: '4px 0 0 0' }}>
+                            {marketData.dowJones.dataSource || 'DJI'} • {marketStatus}
+                          </p>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <p style={{ fontSize: '20px', fontWeight: 'bold', margin: '0' }}>
+                            {marketData.dowJones.price || 'N/A'}
+                          </p>
+                          <p style={{ 
+                            fontSize: '14px', 
+                            color: marketData.dowJones.change && parseFloat(marketData.dowJones.change.replace('%', '')) >= 0 ? '#10B981' : '#EF4444',
+                            margin: '4px 0 0 0' 
+                          }}>
+                            {marketData.dowJones.change || 'N/A'} {marketData.dowJones.changePercent && `(${marketData.dowJones.changePercent})`}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '12px', color: '#F59E0B' }}>
+                    🏛️ Economic Indicators
+                  </h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+                    {marketData.treasury10y && (
+                      <div style={{
+                        backgroundColor: '#1a1a1a',
+                        borderRadius: '16px',
+                        padding: '20px',
+                        border: '1px solid #1F2937'
+                      }}>
+                        <p style={{ fontWeight: '600', margin: '0 0 8px 0', fontSize: '14px' }}>10-Year Treasury</p>
+                        <p style={{ fontSize: '24px', fontWeight: 'bold', margin: '0', color: '#F59E0B' }}>
+                          {marketData.treasury10y.yield || marketData.treasury10y.value || 'N/A'}%
+                        </p>
+                      </div>
+                    )}
+
+                    {marketData.vix && (
+                      <div style={{
+                        backgroundColor: '#1a1a1a',
+                        borderRadius: '16px',
+                        padding: '20px',
+                        border: '1px solid #1F2937'
+                      }}>
+                        <p style={{ fontWeight: '600', margin: '0 0 8px 0', fontSize: '14px' }}>VIX (Fear Index)</p>
+                        <p style={{ fontSize: '24px', fontWeight: 'bold', margin: '0' }}>
+                          {marketData.vix.price || 'N/A'}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
