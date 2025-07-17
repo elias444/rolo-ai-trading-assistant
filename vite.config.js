@@ -1,16 +1,31 @@
+// vite.config.js
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-// https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react()],
-  // Ensure esbuild correctly handles JSX files
-  esbuild: {
-    loader: 'jsx',
-    include: /src\/.*\.jsx?$/, // Apply JSX loader to .js and .jsx files in src
-    exclude: [], // No files to exclude
-  },
+  plugins: [
+    react({
+      jsxRuntime: 'automatic',
+    }),
+  ],
+  base: '/',
   build: {
-    outDir: 'dist', // Default output directory for builds
+    outDir: 'dist',
+  },
+  server: {
+    proxy: {
+      '/.netlify/functions': {
+        target: 'http://localhost:9000',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/.netlify\/functions/, ''),
+      },
+    },
+  },
+  optimizeDeps: {
+    esbuildOptions: {
+      loader: {
+        '.js': 'jsx',
+      },
+    },
   },
 });
