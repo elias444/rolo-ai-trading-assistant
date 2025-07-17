@@ -70,6 +70,8 @@ const fetchData = async (url, apiKey, errorMessage) => {
 
 // Main App Component
 const App = () => {
+    console.log("RoloApp component is rendering."); // Added for debugging Canvas preview
+
     const [activeTab, setActiveTab] = useState('stocks');
     const [stocks, setStocks] = useState([]);
     const [watchlist, setWatchlist] = useState([]);
@@ -93,9 +95,10 @@ const App = () => {
     const chatContainerRef = useRef(null);
 
     // Access API keys from environment variables (Vite-specific)
-    // These will be replaced by Netlify's environment variables during the build.
-    const ALPHA_VANTAGE_API_KEY = import.meta.env.VITE_ALPHA_VANTAGE_API_KEY;
-    const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+    // Use a fallback for Canvas preview if import.meta.env is not available
+    const ALPHA_VANTAGE_API_KEY = typeof import.meta.env !== 'undefined' ? import.meta.env.VITE_ALPHA_VANTAGE_API_KEY : '';
+    const GEMINI_API_KEY = typeof import.meta.env !== 'undefined' ? import.meta.env.VITE_GEMINI_API_KEY : '';
+
 
     // --- Data Fetching Functions ---
     const fetchStockQuote = useCallback(async (symbol) => {
@@ -528,77 +531,79 @@ const App = () => {
         );
     };
 
-    const renderStocksTab = () => (
-        <div className="p-4">
-            {error.apiKeys && <ErrorMessage message={error.apiKeys} />}
-            <div className="mb-6">
-                <h2 className="text-2xl font-bold text-white mb-4">My Watchlist</h2>
-                {isLoading.watchlist && <LoadingSpinner />}
-                {error.watchlist && <ErrorMessage message={error.watchlist} />}
-                {watchlist.length === 0 && !isLoading.watchlist ? (
-                    <p className="text-gray-400">Your watchlist is empty. Add stocks from the popular list or search.</p>
-                ) : (
+    const renderStocksTab = () => {
+        return (
+            <div className="p-4">
+                {error.apiKeys && <ErrorMessage message={error.apiKeys} />}
+                <div className="mb-6">
+                    <h2 className="text-2xl font-bold text-white mb-4">My Watchlist</h2>
+                    {isLoading.watchlist && <LoadingSpinner />}
+                    {error.watchlist && <ErrorMessage message={error.watchlist} />}
+                    {watchlist.length === 0 && !isLoading.watchlist ? (
+                        <p className="text-gray-400">Your watchlist is empty. Add stocks from the popular list or search.</p>
+                    ) : (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                            {watchlist.map(item => {
+                                const fullStock = stocks.find(s => s.symbol === item.symbol) || { symbol: item.symbol, price: 0, change: 0, percentChange: 0 };
+                                return (
+                                    <StockCard
+                                        key={item.id}
+                                        stock={fullStock}
+                                        onClick={setSelectedStock}
+                                        onAddRemoveWatchlist={() => handleRemoveFromWatchlist(item.id)}
+                                        isWatchlist={true}
+                                    />
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+
+                <div className="mb-6">
+                    <h2 className="text-2xl font-bold text-white mb-4">Popular Stocks</h2>
+                    {isLoading.popularStocks && <LoadingSpinner />}
+                    {error.popularStocks && <ErrorMessage message={error.popularStocks} />}
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                        {watchlist.map(item => {
-                            const fullStock = stocks.find(s => s.symbol === item.symbol) || { symbol: item.symbol, price: 0, change: 0, percentChange: 0 };
-                            return (
-                                <StockCard
-                                    key={item.id}
-                                    stock={fullStock}
-                                    onClick={setSelectedStock}
-                                    onAddRemoveWatchlist={() => handleRemoveFromWatchlist(item.id)}
-                                    isWatchlist={true}
-                                />
-                            );
-                        })}
+                        {stocks.filter(s => !watchlist.some(w => w.symbol === s.symbol)).map(stock => (
+                            <StockCard
+                                key={stock.symbol}
+                                stock={stock}
+                                onClick={setSelectedStock}
+                                onAddRemoveWatchlist={handleAddToWatchlist}
+                                isWatchlist={false}
+                            />
+                        ))}
                     </div>
-                )}
-            </div>
+                </div>
 
-            <div className="mb-6">
-                <h2 className="text-2xl font-bold text-white mb-4">Popular Stocks</h2>
-                {isLoading.popularStocks && <LoadingSpinner />}
-                {error.popularStocks && <ErrorMessage message={error.popularStocks} />}
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                    {stocks.filter(s => !watchlist.some(w => w.symbol === s.symbol)).map(stock => (
-                        <StockCard
-                            key={stock.symbol}
-                            stock={stock}
-                            onClick={setSelectedStock}
-                            onAddRemoveWatchlist={handleAddToWatchlist}
-                            isWatchlist={false}
+                <div className="mb-6">
+                    <h2 className="text-2xl font-bold text-white mb-4">Search Stock</h2>
+                    <div className="flex space-x-2">
+                        <input
+                            type="text"
+                            placeholder="Enter stock symbol (e.g., AAPL)"
+                            className="flex-grow p-3 rounded-lg bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            onKeyPress={(e) => {
+                                if (e.key === 'Enter') {
+                                    handleSearchStock();
+                                }
+                            }}
                         />
-                    ))}
+                        <button
+                            onClick={handleSearchStock}
+                            className="px-5 py-3 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition-colors duration-200"
+                        >
+                            Search
+                        </button>
+                    </div>
+                    {isLoading.search && <LoadingSpinner />}
+                    {error.search && <ErrorMessage message={error.search} />}
                 </div>
             </div>
-
-            <div className="mb-6">
-                <h2 className="text-2xl font-bold text-white mb-4">Search Stock</h2>
-                <div className="flex space-x-2">
-                    <input
-                        type="text"
-                        placeholder="Enter stock symbol (e.g., AAPL)"
-                        className="flex-grow p-3 rounded-lg bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        onKeyPress={(e) => {
-                            if (e.key === 'Enter') {
-                                handleSearchStock();
-                            }
-                        }}
-                    />
-                    <button
-                        onClick={handleSearchStock}
-                        className="px-5 py-3 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition-colors duration-200"
-                    >
-                        Search
-                    </button>
-                </div>
-                {isLoading.search && <LoadingSpinner />}
-                {error.search && <ErrorMessage message={error.search} />}
-            </div>
-        </div>
-    );
+        );
+    };
 
     const renderAnalysisTab = () => (
         <div className="p-4">
