@@ -1,14 +1,17 @@
 [build]
-  command = "npm run build"
-  publish = "build"
-  functions = "netlify/functions"
+  command = "npm run build" # This tells Netlify to run the "build" script defined in your package.json
+  publish = "dist"          # This tells Netlify that the compiled website files will be in a folder named 'dist' after the build.
+
+[functions]
+  directory = "netlify/functions" # This tells Netlify where to find your serverless functions.
+  node_bundler = "esbuild"        # esbuild is generally faster for bundling Node.js functions.
+  external_node_modules = ["react", "react-dom"] # Ensure these are external for functions if you use them
 
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
-
-[[redirects]]
-  from = "/.netlify/functions/*"
-  to = "/.netlify/functions/:splat"
-  status = 200
+  # This redirect rule is crucial for Single Page Applications (SPAs) like yours.
+  # It ensures that all routes (e.g., /ticker, /chat) are redirected to your
+  # index.html, allowing your client-side routing (React Router or similar)
+  # to handle the actual routing within the app.
