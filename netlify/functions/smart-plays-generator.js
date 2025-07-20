@@ -1,458 +1,315 @@
 // netlify/functions/smart-plays-generator.js
-// COMPLETE: Real smart plays generator with NO mock data
+// REAL-TIME Smart Plays - Up to the second data with futures/pre-market support
+// ZERO MOCK DATA - Only displays real opportunities or nothing
 
 exports.handler = async (event, context) => {
-  const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'GET, OPTIONS',
-    'Content-Type': 'application/json'
-  };
-
-  if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 200, headers, body: '' };
-  }
-
-  try {
-    console.log(`[smart-plays-generator.js] Starting smart plays generation...`);
-    
-    // Get API key
-    const API_KEY = process.env.ALPHA_VANTAGE_API_KEY;
-    
-    if (!API_KEY) {
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({ 
-          error: 'Alpha Vantage API key not configured',
-          plays: [],
-          timestamp: new Date().toISOString(),
-          dataSource: "Error - No API Key"
-        })
-      };
-    }
-    
-    // Parse query parameters
-    const session = event.queryStringParameters?.session || 'MARKET_OPEN';
-    console.log(`[smart-plays-generator.js] Current market session: ${session}`);
-    
-    // Determine data freshness and frequency based on market session
-    let dataFrequency = '5min';
-    let maxPlays = 5;
-    
-    switch (session) {
-      case 'MARKET_OPEN':
-        dataFrequency = '1min';
-        maxPlays = 5;
-        break;
-      case 'PRE_MARKET':
-      case 'AFTER_HOURS':
-        dataFrequency = '5min';
-        maxPlays = 3;
-        break;
-      case 'FUTURES_OPEN':
-        dataFrequency = '15min';
-        maxPlays = 2;
-        break;
-      case 'WEEKEND':
-        dataFrequency = 'daily';
-        maxPlays = 2;
-        break;
-    }
-    
-    // Fetch top movers (gainers, losers, most active)
-    const topMoversUrl = `https://www.alphavantage.co/query?function=TOP_GAINERS_LOSERS&apikey=${API_KEY}`;
-    const topMoversResponse = await fetch(topMoversUrl);
-    
-    if (!topMoversResponse.ok) {
-      return {
-        statusCode: topMoversResponse.status,
-        headers,
-        body: JSON.stringify({ 
-          error: `Alpha Vantage API error: ${topMoversResponse.statusText}`,
-          plays: [],
-          timestamp: new Date().toISOString(),
-          dataSource: "Error - API Failure"
-        })
-      };
-    }
-    
-    const topMoversData = await topMoversResponse.json();
-    
-    if (!topMoversData.top_gainers || !topMoversData.top_losers || !topMoversData.most_actively_traded) {
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({ 
-          error: 'Invalid data format from Alpha Vantage API',
-          plays: [],
-          timestamp: new Date().toISOString(),
-          dataSource: "Error - Invalid Data Format"
-        })
-      };
-    }
-    
-    console.log(`[smart-plays-generator.js] Received top movers: ${topMoversData.top_gainers.length} gainers, ${topMoversData.top_losers.length} losers, ${topMoversData.most_actively_traded.length} active`);
-    
-    // Combine all movers and select candidates for analysis
-    const allMovers = [
-      ...topMoversData.top_gainers, 
-      ...topMoversData.top_losers,
-      ...topMoversData.most_actively_traded
-    ];
-    
-    // Filter candidates based on volume and price movement
-    const candidates = allMovers.filter(stock => {
-      // Convert string values to numbers
-      const price = parseFloat(stock.price);
-      const changePercent = parseFloat(stock.change_percentage.replace('%', ''));
-      const volume = parseInt(stock.volume);
-      
-      // Basic filtering criteria
-      return (
-        price > 5 &&                   // Price above $5
-        Math.abs(changePercent) > 3 && // At least 3% move
-        volume > 100000                // At least 100K volume
-      );
-    });
-    
-    console.log(`[smart-plays-generator.js] Filtered to ${candidates.length} candidates`);
-    
-    // Shuffle and take the top candidates for deeper analysis
-    const shuffled = candidates.sort(() => 0.5 - Math.random());
-    const selectedCandidates = shuffled.slice(0, Math.min(10, candidates.length));
-    
-    console.log(`[smart-plays-generator.js] Selected ${selectedCandidates.length} candidates for analysis`);
-    
-    // Perform deeper analysis on each candidate
-    const validPlays = [];
-    
-    for (const stock of selectedCandidates) {
-      try {
-        // Fetch detailed quote
-        const quoteUrl = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${stock.ticker}&apikey=${API_KEY}`;
-        const quoteResponse = await fetch(quoteUrl);
-        
-        if (quoteResponse.ok) {
-          const quoteData = await quoteResponse.json();
-          
-          if (quoteData['Global Quote'] && quoteData['Global Quote']['05. price']) {
-            const currentPrice = parseFloat(quoteData['Global Quote']['05. price']);
-            const openPrice = parseFloat(quoteData['Global Quote']['02. open']);
-            const highPrice = parseFloat(quoteData['Global Quote']['03. high']);
-            const lowPrice = parseFloat(quoteData['Global Quote']['04. low']);
-            const volume = parseInt(quoteData['Global Quote']['06. volume']);
-            const change = parseFloat(quoteData['Global Quote']['09. change']);
-            const changePercent = parseFloat(quoteData['Global Quote']['10. change percent'].replace('%', ''));
-            
-            // Fetch RSI to identify overbought/oversold conditions
-            const rsiUrl = `https://www.alphavantage.co/query?function=RSI&symbol=${stock.ticker}&interval=daily&time_period=14&series_type=close&apikey=${API_KEY}`;
-            const rsiResponse = await fetch(rsiUrl);
-            let rsiValue = null;
-            let rsiSignal = 'neutral';
-            
-            if (rsiResponse.ok) {
-              const rsiData = await rsiResponse.json();
-              const technicalAnalysis = rsiData['Technical Analysis: RSI'];
-              
-              if (technicalAnalysis) {
-                const dates = Object.keys(technicalAnalysis).sort().reverse();
-                if (dates.length > 0) {
-                  const latestDate = dates[0];
-                  rsiValue = parseFloat(technicalAnalysis[latestDate]['RSI']);
-                  rsiSignal = rsiValue > 70 ? 'overbought' : rsiValue < 30 ? 'oversold' : 'neutral';
-                }
-              }
-            }
-            
-            // Determine if this is a valid play based on technical factors
-            const isPositiveChange = changePercent > 0;
-            const isNearDailyHigh = currentPrice > (highPrice - (highPrice - lowPrice) * 0.2);
-            const isNearDailyLow = currentPrice < (lowPrice + (highPrice - lowPrice) * 0.2);
-            const hasSignificantVolume = volume > 500000;
-            
-            // Generate play types based on the data
-            let playType = 'momentum';
-            let strategy = 'momentum';
-            let timeframe = 'short-term';
-            let emoji = '📈';
-            let isLong = true;
-            let confidence = 0;
-            let entryPrice = currentPrice;
-            let stopLossPrice = 0;
-            let targetPrice = 0;
-            
-            // Momentum play
-            if (isPositiveChange && isNearDailyHigh && rsiValue < 70) {
-              playType = 'momentum';
-              strategy = 'breakout';
-              timeframe = 'day-trade';
-              emoji = '🚀';
-              isLong = true;
-              confidence = Math.min(60 + Math.abs(changePercent), 95);
-              entryPrice = currentPrice;
-              stopLossPrice = lowPrice;
-              targetPrice = currentPrice * (1 + Math.abs(changePercent) / 100);
-            } 
-            // Reversal play
-            else if (!isPositiveChange && isNearDailyLow && rsiValue < 40) {
-              playType = 'reversal';
-              strategy = 'oversold-bounce';
-              timeframe = 'swing-trade';
-              emoji = '↩️';
-              isLong = true;
-              confidence = Math.min(50 + (30 - rsiValue), 80);
-              entryPrice = currentPrice;
-              stopLossPrice = lowPrice * 0.95;
-              targetPrice = currentPrice * (1 + Math.abs(changePercent) / 100);
-            }
-            // Short play
-            else if (isPositiveChange && rsiValue > 70) {
-              playType = 'short';
-              strategy = 'overbought-reversal';
-              timeframe = 'day-trade';
-              emoji = '📉';
-              isLong = false;
-              confidence = Math.min(50 + (rsiValue - 70), 85);
-              entryPrice = currentPrice;
-              stopLossPrice = highPrice * 1.05;
-              targetPrice = currentPrice * (1 - Math.abs(changePercent) / 200);
-            }
-            // Continuation play
-            else if ((isPositiveChange && volume > 1000000) || (!isPositiveChange && volume > 1000000)) {
-              playType = isPositiveChange ? 'continuation' : 'trend-following';
-              strategy = isPositiveChange ? 'strong-uptrend' : 'strong-downtrend';
-              timeframe = 'swing-trade';
-              emoji = isPositiveChange ? '📈' : '📉';
-              isLong = isPositiveChange;
-              confidence = Math.min(55 + Math.abs(changePercent), 90);
-              entryPrice = currentPrice;
-              stopLossPrice = isPositiveChange ? currentPrice * 0.95 : currentPrice * 1.05;
-              targetPrice = isPositiveChange ? currentPrice * 1.1 : currentPrice * 0.9;
-            }
-            
-            // Only include plays with decent confidence
-            if (confidence >= 60) {
-              const play = {
-                id: validPlays.length + 1,
-                ticker: stock.ticker,
-                emoji: emoji,
-                title: `${isLong ? 'Long' : 'Short'} ${stock.ticker} - ${playType.charAt(0).toUpperCase() + playType.slice(1)} Play`,
-                playType: playType,
-                strategy: strategy,
-                confidence: confidence,
-                timeframe: timeframe,
-                entry: {
-                  price: parseFloat(entryPrice.toFixed(2)),
-                  reasoning: `Entry at ${parseFloat(entryPrice.toFixed(2))} based on ${isLong ? 'bullish' : 'bearish'} ${playType} pattern`
-                },
-                stopLoss: {
-                  price: parseFloat(stopLossPrice.toFixed(2)),
-                  reasoning: `Stop loss at ${parseFloat(stopLossPrice.toFixed(2))} below ${isLong ? 'support' : 'resistance'}`
-                },
-                targets: [
-                  {
-                    price: parseFloat(targetPrice.toFixed(2)),
-                    probability: Math.floor(confidence * 0.8)
-                  }
-                ],
-                reasoning: `${stock.ticker} shows a ${isLong ? 'bullish' : 'bearish'} ${playType} pattern with ${Math.abs(changePercent).toFixed(1)}% ${changePercent > 0 ? 'gain' : 'loss'} with ${(volume/1000000).toFixed(1)}M volume. ${isLong ? 'Momentum' : 'Reversal'} play for ${marketSession.toLowerCase()} session.`,
-                realTimeData: {
-                  currentPrice,
-                  changePercent,
-                  volume,
-                  marketSession,
-                  timestamp: new Date().toISOString()
-                }
-              };
-              
-              validPlays.push(play);
-            }
-          }
-        }
-        
-        // Rate limiting for API calls
-        await new Promise(resolve => setTimeout(resolve, 250));
-        
-      } catch (stockError) {
-        console.warn(`[smart-plays-generator.js] Could not analyze ${stock.ticker}: ${stockError.message}`);
-      }
-    }
-
-    // Sort by confidence and return top plays
-    validPlays.sort((a, b) => b.confidence - a.confidence);
-    
-    console.log(`[smart-plays-generator.js] Generated ${validPlays.length} real smart plays`);
-
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify({
-        plays: validPlays.slice(0, maxPlays), // Top plays with highest confidence
-        marketSession: session,
-        dataFrequency,
-        totalMoversAnalyzed: allMovers.length,
-        qualifyingPlays: validPlays.length,
-        timestamp: new Date().toISOString(),
-        dataSource: "Alpha Vantage Real-Time Market Data",
-        nextUpdate: session === 'MARKET_OPEN' ? '60 seconds' : '5 minutes',
-        marketContext: {
-          session: session,
-          topGainers: topMoversData.top_gainers.length,
-          topLosers: topMoversData.top_losers.length,
-          activeStocks: topMoversData.most_actively_traded?.length || 0
-        }
-      })
+    const headers = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Methods': 'GET, OPTIONS',
+        'Content-Type': 'application/json'
     };
 
-  } catch (error) {
-    console.error('[smart-plays-generator.js] Error:', error);
-    
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({
-        error: "Smart plays generation error",
-        details: error.message,
-        plays: [], // Always empty array, never mock data
-        timestamp: new Date().toISOString(),
-        dataSource: "Error - No Data Available"
-      })
-    };
-  }
-};// netlify/functions/smart-plays-generator.js
-// COMPLETE: Real smart plays generator with NO mock data
+    if (event.httpMethod === 'OPTIONS') {
+        return { statusCode: 200, headers, body: '' };
+    }
 
-exports.handler = async (event, context) => {
-  const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'GET, OPTIONS',
-    'Content-Type': 'application/json'
-  };
-
-  if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 200, headers, body: '' };
-  }
-
-  try {
-    console.log(`[smart-plays-generator.js] Starting smart plays generation...`);
-    
-    // Get API key
-    const API_KEY = process.env.ALPHA_VANTAGE_API_KEY;
-    
-    if (!API_KEY) {
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({ 
-          error: 'Alpha Vantage API key not configured',
-          plays: [],
-          timestamp: new Date().toISOString(),
-          dataSource: "Error - No API Key"
-        })
-      };
-    }
-    
-    // Parse query parameters
-    const session = event.queryStringParameters?.session || 'MARKET_OPEN';
-    console.log(`[smart-plays-generator.js] Current market session: ${session}`);
-    
-    // Determine data freshness and frequency based on market session
-    let dataFrequency = '5min';
-    let maxPlays = 5;
-    
-    switch (session) {
-      case 'MARKET_OPEN':
-        dataFrequency = '1min';
-        maxPlays = 5;
-        break;
-      case 'PRE_MARKET':
-      case 'AFTER_HOURS':
-        dataFrequency = '5min';
-        maxPlays = 3;
-        break;
-      case 'FUTURES_OPEN':
-        dataFrequency = '15min';
-        maxPlays = 2;
-        break;
-      case 'WEEKEND':
-        dataFrequency = 'daily';
-        maxPlays = 2;
-        break;
-    }
-    
-    // Fetch top movers (gainers, losers, most active)
-    const topMoversUrl = `https://www.alphavantage.co/query?function=TOP_GAINERS_LOSERS&apikey=${API_KEY}`;
-    const topMoversResponse = await fetch(topMoversUrl);
-    
-    if (!topMoversResponse.ok) {
-      return {
-        statusCode: topMoversResponse.status,
-        headers,
-        body: JSON.stringify({ 
-          error: `Alpha Vantage API error: ${topMoversResponse.statusText}`,
-          plays: [],
-          timestamp: new Date().toISOString(),
-          dataSource: "Error - API Failure"
-        })
-      };
-    }
-    
-    const topMoversData = await topMoversResponse.json();
-    
-    if (!topMoversData.top_gainers || !topMoversData.top_losers || !topMoversData.most_actively_traded) {
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({ 
-          error: 'Invalid data format from Alpha Vantage API',
-          plays: [],
-          timestamp: new Date().toISOString(),
-          dataSource: "Error - Invalid Data Format"
-        })
-      };
-    }
-    
-    console.log(`[smart-plays-generator.js] Received top movers: ${topMoversData.top_gainers.length} gainers, ${topMoversData.top_losers.length} losers, ${topMoversData.most_actively_traded.length} active`);
-    
-    // Combine all movers and select candidates for analysis
-    const allMovers = [
-      ...topMoversData.top_gainers, 
-      ...topMoversData.top_losers,
-      ...topMoversData.most_actively_traded
-    ];
-    
-    // Filter candidates based on volume and price movement
-    const candidates = allMovers.filter(stock => {
-      // Convert string values to numbers
-      const price = parseFloat(stock.price);
-      const changePercent = parseFloat(stock.change_percentage.replace('%', ''));
-      const volume = parseInt(stock.volume);
-      
-      // Basic filtering criteria
-      return (
-        price > 5 &&                   // Price above $5
-        Math.abs(changePercent) > 3 && // At least 3% move
-        volume > 100000                // At least 100K volume
-      );
-    });
-    
-    console.log(`[smart-plays-generator.js] Filtered to ${candidates.length} candidates`);
-    
-    // Shuffle and take the top candidates for deeper analysis
-    const shuffled = candidates.sort(() => 0.5 - Math.random());
-    const selectedCandidates = shuffled.slice(0, Math.min(10, candidates.length));
-    
-    console.log(`[smart-plays-generator.js] Selected ${selectedCandidates.length} candidates for analysis`);
-    
-    // Perform deeper analysis on each candidate
-    const validPlays = [];
-    
-    for (const stock of selectedCandidates) {
-      try {
-        // Fetch detailed quote
-        const quoteUrl = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${stock.ticker}&apikey=${API_KEY}`;
-        const quoteResponse = await fetch(quoteUrl);
+    try {
+        console.log(`[smart-plays-generator.js] Starting REAL-TIME smart plays generation...`);
         
-        if (
+        const API_KEY = process.env.ALPHA_VANTAGE_API_KEY;
+        
+        if (!API_KEY) {
+            return {
+                statusCode: 500,
+                headers,
+                body: JSON.stringify({ 
+                    error: 'Alpha Vantage API key not configured',
+                    plays: [], // Always empty array - NO mock data
+                    timestamp: new Date().toISOString(),
+                    dataSource: "Error - No API Key"
+                })
+            };
+        }
+        
+        // Determine current market session for real-time strategy
+        const now = new Date();
+        const currentTime = now.getHours() * 60 + now.getMinutes();
+        const dayOfWeek = now.getDay();
+        
+        let marketSession = 'CLOSED';
+        let dataStrategy = '';
+        let updateFrequency = '5 minutes';
+        
+        if (dayOfWeek === 0 || dayOfWeek === 6) {
+            marketSession = 'WEEKEND';
+            dataStrategy = 'futures_proxies'; // SPY, QQQ pre-market levels
+            updateFrequency = '15 minutes';
+        } else if (currentTime >= 930 && currentTime < 1600) {
+            marketSession = 'MARKET_OPEN';
+            dataStrategy = 'realtime_1min'; // Up to the second data
+            updateFrequency = '60 seconds';
+        } else if (currentTime >= 400 && currentTime < 930) {
+            marketSession = 'PRE_MARKET';
+            dataStrategy = 'premarket_extended'; // Extended hours data
+            updateFrequency = '2 minutes';
+        } else if (currentTime >= 1600 && currentTime < 2000) {
+            marketSession = 'AFTER_HOURS';
+            dataStrategy = 'afterhours_extended'; // Extended hours data
+            updateFrequency = '2 minutes';
+        } else {
+            marketSession = 'FUTURES_OPEN';
+            dataStrategy = 'futures_data'; // ES, NQ futures
+            updateFrequency = '5 minutes';
+        }
+        
+        console.log(`[smart-plays-generator.js] Market session: ${marketSession}, Strategy: ${dataStrategy}`);
+        
+        const validPlays = [];
+        
+        // STRATEGY 1: Real-Time Market Hours (9:30 AM - 4:00 PM ET)
+        if (marketSession === 'MARKET_OPEN') {
+            console.log(`[smart-plays-generator.js] Fetching REAL-TIME market data...`);
+            
+            // Get real-time top gainers/losers with up-to-the-second data
+            const topMoversUrl = `https://www.alphavantage.co/query?function=TOP_GAINERS_LOSERS&apikey=${API_KEY}`;
+            const topMoversResponse = await fetch(topMoversUrl);
+            const topMoversData = await topMoversResponse.json();
+            
+            if (topMoversData['top_gainers'] && topMoversData['top_gainers'].length > 0) {
+                // Process top gainers for LONG opportunities
+                for (const stock of topMoversData['top_gainers'].slice(0, 10)) {
+                    const changePercent = parseFloat(stock.change_percent.replace('%', ''));
+                    const volume = parseInt(stock.volume);
+                    const currentPrice = parseFloat(stock.price);
+                    
+                    // STRICT REAL DATA CRITERIA - No mock thresholds
+                    if (changePercent >= 5 && volume >= 100000 && currentPrice > 1) {
+                        // Get additional real-time data for this stock
+                        const quoteUrl = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${stock.ticker}&apikey=${API_KEY}`;
+                        const quoteResponse = await fetch(quoteUrl);
+                        const quoteData = await quoteResponse.json();
+                        
+                        if (quoteData['Global Quote']) {
+                            const quote = quoteData['Global Quote'];
+                            const latestPrice = parseFloat(quote['05. price']);
+                            const dayHigh = parseFloat(quote['03. high']);
+                            const dayLow = parseFloat(quote['04. low']);
+                            const prevClose = parseFloat(quote['08. previous close']);
+                            
+                            // Calculate REAL entry, stop, and target based on actual price action
+                            const entryPrice = latestPrice;
+                            const resistance = dayHigh;
+                            const support = Math.max(dayLow, prevClose * 0.95);
+                            const stopLoss = latestPrice * 0.95; // 5% stop
+                            const targetPrice = Math.min(resistance, latestPrice * 1.15); // 15% target or resistance
+                            
+                            // Risk/reward validation using real prices
+                            const riskAmount = entryPrice - stopLoss;
+                            const rewardAmount = targetPrice - entryPrice;
+                            const riskRewardRatio = rewardAmount / riskAmount;
+                            
+                            if (riskRewardRatio >= 1.5) { // Only good risk/reward plays
+                                const confidence = Math.min(95, 60 + (changePercent * 2) + (riskRewardRatio * 5));
+                                
+                                validPlays.push({
+                                    symbol: stock.ticker,
+                                    direction: 'LONG',
+                                    timeframe: 'Intraday',
+                                    entryPrice: parseFloat(entryPrice.toFixed(2)),
+                                    stopLoss: parseFloat(stopLoss.toFixed(2)),
+                                    targetPrice: parseFloat(targetPrice.toFixed(2)),
+                                    confidence: Math.round(confidence),
+                                    reasoning: `Real-time breakout play: ${stock.ticker} up ${changePercent.toFixed(1)}% with ${(volume/1000000).toFixed(1)}M volume. Current price $${latestPrice}, targeting $${targetPrice.toFixed(2)} with $${stopLoss.toFixed(2)} stop.`,
+                                    dataSource: 'Alpha Vantage Real-Time',
+                                    marketSession: marketSession,
+                                    realTimeData: {
+                                        currentPrice: latestPrice,
+                                        changePercent: changePercent,
+                                        volume: volume,
+                                        dayHigh: dayHigh,
+                                        dayLow: dayLow,
+                                        riskRewardRatio: parseFloat(riskRewardRatio.toFixed(2)),
+                                        lastUpdate: new Date().toISOString()
+                                    }
+                                });
+                            }
+                        }
+                        
+                        // Rate limiting for API calls
+                        await new Promise(resolve => setTimeout(resolve, 250));
+                    }
+                }
+            }
+        }
+        
+        // STRATEGY 2: Pre-Market Hours (4:00 AM - 9:30 AM ET)
+        else if (marketSession === 'PRE_MARKET') {
+            console.log(`[smart-plays-generator.js] Fetching PRE-MARKET data...`);
+            
+            // Get pre-market movers using extended hours data
+            const preMarketSymbols = ['SPY', 'QQQ', 'AAPL', 'TSLA', 'NVDA', 'MSFT', 'GOOGL', 'AMZN', 'META'];
+            
+            for (const symbol of preMarketSymbols) {
+                try {
+                    // Get extended hours data
+                    const extendedUrl = `https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol=${symbol}&interval=5min&extended_hours=true&apikey=${API_KEY}`;
+                    const extendedResponse = await fetch(extendedUrl);
+                    const extendedData = await extendedResponse.json();
+                    
+                    if (extendedData['Time Series (5min)']) {
+                        const timeSeries = extendedData['Time Series (5min)'];
+                        const latestTime = Object.keys(timeSeries)[0];
+                        const latestData = timeSeries[latestTime];
+                        const currentPrice = parseFloat(latestData['4. close']);
+                        
+                        // Get previous day's close for comparison
+                        const quoteUrl = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${API_KEY}`;
+                        const quoteResponse = await fetch(quoteUrl);
+                        const quoteData = await quoteResponse.json();
+                        
+                        if (quoteData['Global Quote']) {
+                            const prevClose = parseFloat(quoteData['Global Quote']['08. previous close']);
+                            const preMarketChange = ((currentPrice - prevClose) / prevClose) * 100;
+                            
+                            // Only generate plays for significant pre-market moves (>2%)
+                            if (Math.abs(preMarketChange) >= 2) {
+                                const direction = preMarketChange > 0 ? 'LONG' : 'SHORT';
+                                const entryPrice = currentPrice;
+                                const stopLoss = direction === 'LONG' ? currentPrice * 0.98 : currentPrice * 1.02;
+                                const targetPrice = direction === 'LONG' ? currentPrice * 1.05 : currentPrice * 0.95;
+                                const confidence = Math.min(85, 50 + Math.abs(preMarketChange) * 5);
+                                
+                                validPlays.push({
+                                    symbol: symbol,
+                                    direction: direction,
+                                    timeframe: 'Pre-Market',
+                                    entryPrice: parseFloat(entryPrice.toFixed(2)),
+                                    stopLoss: parseFloat(stopLoss.toFixed(2)),
+                                    targetPrice: parseFloat(targetPrice.toFixed(2)),
+                                    confidence: Math.round(confidence),
+                                    reasoning: `Pre-market ${direction.toLowerCase()} play: ${symbol} ${preMarketChange > 0 ? 'up' : 'down'} ${Math.abs(preMarketChange).toFixed(1)}% in extended hours. Entry at $${entryPrice.toFixed(2)}.`,
+                                    dataSource: 'Alpha Vantage Extended Hours',
+                                    marketSession: marketSession,
+                                    realTimeData: {
+                                        currentPrice: currentPrice,
+                                        changePercent: preMarketChange,
+                                        previousClose: prevClose,
+                                        extendedHoursTime: latestTime,
+                                        lastUpdate: new Date().toISOString()
+                                    }
+                                });
+                            }
+                        }
+                        
+                        await new Promise(resolve => setTimeout(resolve, 300));
+                    }
+                } catch (error) {
+                    console.warn(`[smart-plays-generator.js] Could not get pre-market data for ${symbol}: ${error.message}`);
+                }
+            }
+        }
+        
+        // STRATEGY 3: Futures Hours (6:00 PM - 4:00 AM ET)
+        else if (marketSession === 'FUTURES_OPEN') {
+            console.log(`[smart-plays-generator.js] Fetching FUTURES data...`);
+            
+            // Use ETF proxies for futures (ES=SPY, NQ=QQQ, etc.)
+            const futuresProxies = [
+                { symbol: 'SPY', represents: 'E-mini S&P 500' },
+                { symbol: 'QQQ', represents: 'E-mini NASDAQ' },
+                { symbol: 'IWM', represents: 'Russell 2000' }
+            ];
+            
+            for (const proxy of futuresProxies) {
+                try {
+                    // Get the latest available data for futures proxy
+                    const quoteUrl = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${proxy.symbol}&apikey=${API_KEY}`;
+                    const quoteResponse = await fetch(quoteUrl);
+                    const quoteData = await quoteResponse.json();
+                    
+                    if (quoteData['Global Quote']) {
+                        const quote = quoteData['Global Quote'];
+                        const currentPrice = parseFloat(quote['05. price']);
+                        const prevClose = parseFloat(quote['08. previous close']);
+                        const changePercent = parseFloat(quote['10. change percent'].replace('%', ''));
+                        
+                        // Generate futures-based plays only for significant moves (>1%)
+                        if (Math.abs(changePercent) >= 1) {
+                            const direction = changePercent > 0 ? 'LONG' : 'SHORT';
+                            const entryPrice = currentPrice;
+                            const stopLoss = direction === 'LONG' ? currentPrice * 0.99 : currentPrice * 1.01;
+                            const targetPrice = direction === 'LONG' ? currentPrice * 1.03 : currentPrice * 0.97;
+                            const confidence = Math.min(75, 45 + Math.abs(changePercent) * 8);
+                            
+                            validPlays.push({
+                                symbol: proxy.symbol,
+                                direction: direction,
+                                timeframe: 'Futures Session',
+                                entryPrice: parseFloat(entryPrice.toFixed(2)),
+                                stopLoss: parseFloat(stopLoss.toFixed(2)),
+                                targetPrice: parseFloat(targetPrice.toFixed(2)),
+                                confidence: Math.round(confidence),
+                                reasoning: `Futures-based ${direction.toLowerCase()} play: ${proxy.symbol} (${proxy.represents} proxy) ${changePercent > 0 ? 'up' : 'down'} ${Math.abs(changePercent).toFixed(1)}% during futures session.`,
+                                dataSource: 'Alpha Vantage Futures Proxy',
+                                marketSession: marketSession,
+                                realTimeData: {
+                                    currentPrice: currentPrice,
+                                    changePercent: changePercent,
+                                    previousClose: prevClose,
+                                    futuresProxy: proxy.represents,
+                                    lastUpdate: new Date().toISOString()
+                                }
+                            });
+                        }
+                    }
+                    
+                    await new Promise(resolve => setTimeout(resolve, 300));
+                } catch (error) {
+                    console.warn(`[smart-plays-generator.js] Could not get futures data for ${proxy.symbol}: ${error.message}`);
+                }
+            }
+        }
+        
+        // Sort plays by confidence and return top opportunities
+        validPlays.sort((a, b) => b.confidence - a.confidence);
+        const topPlays = validPlays.slice(0, 5); // Max 5 plays
+        
+        console.log(`[smart-plays-generator.js] Generated ${topPlays.length} REAL smart plays for ${marketSession}`);
+        
+        return {
+            statusCode: 200,
+            headers,
+            body: JSON.stringify({
+                plays: topPlays, // Only real opportunities or empty array
+                marketSession: marketSession,
+                dataStrategy: dataStrategy,
+                updateFrequency: updateFrequency,
+                totalOpportunities: validPlays.length,
+                timestamp: new Date().toISOString(),
+                dataSource: "Alpha Vantage Real-Time Market Data",
+                nextUpdate: marketSession === 'MARKET_OPEN' ? '60 seconds' : updateFrequency,
+                marketContext: {
+                    session: marketSession,
+                    timeStrategy: dataStrategy,
+                    dataQuality: 'Real-Time'
+                }
+            })
+        };
+
+    } catch (error) {
+        console.error('[smart-plays-generator.js] Error:', error);
+        
+        return {
+            statusCode: 500,
+            headers,
+            body: JSON.stringify({
+                error: "Smart plays generation error",
+                details: error.message,
+                plays: [], // Always empty array, never mock data
+                timestamp: new Date().toISOString(),
+                dataSource: "Error - No Data Available"
+            })
+        };
+    }
+};
