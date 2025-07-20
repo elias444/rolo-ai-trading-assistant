@@ -1,15 +1,19 @@
-export default function RoloApp() {
-  const [activeTab, setActiveTab] = React.useState('stocks');
-  const [marketStatus, setMarketStatus] = React.useState('Loading...');
-  const [watchlist, setWatchlist] = React.useState(['AAPL', 'MSFT', 'AMZN', 'GOOGL', 'META', 'TSLA']);
-  const [stocks, setStocks] = React.useState([]);
-  const [isLoading, setIsLoading] = React.useState(false);
-  const [error, setError] = React.useState(null);
+import React, { useState, useEffect } from 'react';
+
+function RoloApp() {
+  // State for tabs and data
+  const [activeTab, setActiveTab] = useState('stocks');
+  const [marketStatus, setMarketStatus] = useState('Loading...');
+  const [watchlist, setWatchlist] = useState(['AAPL', 'MSFT', 'AMZN', 'GOOGL', 'META', 'TSLA']);
+  const [popularStocks, setPopularStocks] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
   
   // Detect market session
-  const getMarketSession = () => {
+  const detectMarketSession = () => {
     const now = new Date();
     const hours = now.getHours();
+    const minutes = now.getMinutes();
     const day = now.getDay(); // 0 = Sunday, 6 = Saturday
     
     if (day === 0 || day === 6) return 'Weekend';
@@ -20,40 +24,65 @@ export default function RoloApp() {
     return 'Futures Open';
   };
   
-  // Fetch stock data
-  React.useEffect(() => {
+  // Fetch stock data from API
+  useEffect(() => {
     async function fetchStocks() {
       if (!watchlist.length) return;
       
       setIsLoading(true);
       setError(null);
-      setMarketStatus(getMarketSession());
+      
+      const currentSession = detectMarketSession();
+      setMarketStatus(currentSession);
       
       try {
-        // Simulate API call (in real app, call your Netlify functions)
-        const mockStocks = watchlist.map(symbol => ({
-          symbol,
-          price: (Math.random() * 500 + 50).toFixed(2),
-          change: (Math.random() * 10 - 5).toFixed(2),
-          changePercent: (Math.random() * 5 - 2.5).toFixed(2) + '%',
-          marketSession: getMarketSession()
-        }));
-        
-        setStocks(mockStocks);
+        // For demo, we'll use simple mock data (in real app, use /.netlify/functions/enhanced-stock-data)
+        setTimeout(() => {
+          const stocks = watchlist.map(symbol => ({
+            symbol,
+            price: (Math.random() * 500 + 50).toFixed(2),
+            change: (Math.random() * 10 - 5).toFixed(2),
+            changePercent: (Math.random() * 5 - 2.5).toFixed(2) + '%',
+            marketSession: currentSession
+          }));
+          
+          setPopularStocks(stocks);
+          setIsLoading(false);
+        }, 1000);
       } catch (err) {
-        setError("Failed to fetch stock data");
-        console.error(err);
-      } finally {
+        console.error('Error fetching stocks:', err);
+        setError('Failed to fetch stock data');
         setIsLoading(false);
       }
     }
     
     fetchStocks();
+    
+    // Set up polling
+    const interval = setInterval(() => {
+      fetchStocks();
+    }, 60000); // refresh every minute
+    
+    return () => clearInterval(interval);
   }, [watchlist]);
   
-  // Format market status with color
+  // Format price change
+  const formatPriceChange = (change, changePercent) => {
+    const isPositive = parseFloat(change) >= 0;
+    const color = isPositive ? 'green' : 'red';
+    const prefix = isPositive ? '+' : '';
+    
+    return (
+      <span style={{ color }}>
+        {`${prefix}${change} (${changePercent})`}
+      </span>
+    );
+  };
+  
+  // Format market status
   const formatMarketStatus = (status) => {
-    let color;
+    let color = '#999';
+    let label = status;
     
     switch (status) {
       case 'Market Open':
@@ -80,7 +109,7 @@ export default function RoloApp() {
       <div style={{
         display: 'inline-flex',
         alignItems: 'center',
-        background: `rgba(128, 128, 128, 0.2)`,
+        background: 'rgba(128, 128, 128, 0.2)',
         padding: '3px 8px',
         borderRadius: '12px',
         fontSize: '12px',
@@ -96,21 +125,8 @@ export default function RoloApp() {
           backgroundColor: color,
           marginRight: '5px'
         }}></span>
-        {status}
+        {label}
       </div>
-    );
-  };
-  
-  // Format price change with color
-  const formatPriceChange = (change, changePercent) => {
-    const isPositive = parseFloat(change) >= 0;
-    const color = isPositive ? 'green' : 'red';
-    const prefix = isPositive ? '+' : '';
-    
-    return (
-      <span style={{ color }}>
-        {`${prefix}${change} (${changePercent})`}
-      </span>
     );
   };
   
@@ -124,7 +140,18 @@ export default function RoloApp() {
       {formatMarketStatus(marketStatus)}
       
       {isLoading ? (
-        <div style={{ textAlign: 'center', padding: '20px' }}>Loading...</div>
+        <div style={{ textAlign: 'center', padding: '20px' }}>
+          <div style={{ 
+            width: '30px', 
+            height: '30px', 
+            border: '3px solid rgba(255, 255, 255, 0.3)', 
+            borderRadius: '50%', 
+            borderTop: '3px solid #fff', 
+            margin: '0 auto',
+            animation: 'spin 1s linear infinite' 
+          }}></div>
+          <p>Loading stocks...</p>
+        </div>
       ) : error ? (
         <div style={{ 
           padding: '20px', 
@@ -142,7 +169,7 @@ export default function RoloApp() {
           gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', 
           gap: '12px'
         }}>
-          {stocks.map(stock => (
+          {popularStocks.map(stock => (
             <div 
               key={stock.symbol}
               style={{
@@ -188,10 +215,10 @@ export default function RoloApp() {
     </div>
   );
   
-  // Render analysis tab
-  const renderAnalysisTab = () => (
+  // Render placeholder for other tabs
+  const renderPlaceholder = (title, emoji, message) => (
     <div style={{ padding: '16px', paddingBottom: '100px' }}>
-      <h2 style={{ margin: '0 0 16px 0', fontSize: '20px', fontWeight: '600' }}>Analysis</h2>
+      <h2 style={{ margin: '0 0 16px 0', fontSize: '20px', fontWeight: '600' }}>{title}</h2>
       <div style={{ 
         padding: '40px 20px', 
         textAlign: 'center', 
@@ -199,110 +226,30 @@ export default function RoloApp() {
         background: 'rgba(255, 255, 255, 0.05)', 
         borderRadius: '8px'
       }}>
-        <div style={{ fontSize: '36px', marginBottom: '10px' }}>🧠</div>
-        <div style={{ fontWeight: '500', marginBottom: '10px', color: '#ccc' }}>Analysis Feature</div>
+        <div style={{ fontSize: '36px', marginBottom: '10px' }}>{emoji}</div>
+        <div style={{ fontWeight: '500', marginBottom: '10px', color: '#ccc' }}>{title} Feature</div>
         <div style={{ fontSize: '14px', opacity: '0.8' }}>
-          Connect your AI API to enable analysis
+          {message}
         </div>
       </div>
     </div>
   );
   
-  // Render smart plays tab
-  const renderSmartPlaysTab = () => (
-    <div style={{ padding: '16px', paddingBottom: '100px' }}>
-      <h2 style={{ margin: '0 0 16px 0', fontSize: '20px', fontWeight: '600' }}>Smart Plays</h2>
-      <div style={{ 
-        padding: '40px 20px', 
-        textAlign: 'center', 
-        color: '#999', 
-        background: 'rgba(255, 255, 255, 0.05)', 
-        borderRadius: '8px'
-      }}>
-        <div style={{ fontSize: '36px', marginBottom: '10px' }}>🎯</div>
-        <div style={{ fontWeight: '500', marginBottom: '10px', color: '#ccc' }}>Smart Plays Feature</div>
-        <div style={{ fontSize: '14px', opacity: '0.8' }}>
-          Connect your Alpha Vantage API to see smart trading opportunities
-        </div>
-      </div>
-    </div>
-  );
-  
-  // Render alerts tab
-  const renderAlertsTab = () => (
-    <div style={{ padding: '16px', paddingBottom: '100px' }}>
-      <h2 style={{ margin: '0 0 16px 0', fontSize: '20px', fontWeight: '600' }}>Real-Time Alerts</h2>
-      <div style={{ 
-        padding: '40px 20px', 
-        textAlign: 'center', 
-        color: '#999', 
-        background: 'rgba(255, 255, 255, 0.05)', 
-        borderRadius: '8px'
-      }}>
-        <div style={{ fontSize: '36px', marginBottom: '10px' }}>🚨</div>
-        <div style={{ fontWeight: '500', marginBottom: '10px', color: '#ccc' }}>Alerts Feature</div>
-        <div style={{ fontSize: '14px', opacity: '0.8' }}>
-          Connect your Alpha Vantage API to see real-time market alerts
-        </div>
-      </div>
-    </div>
-  );
-  
-  // Render market tab
-  const renderMarketTab = () => (
-    <div style={{ padding: '16px', paddingBottom: '100px' }}>
-      <h2 style={{ margin: '0 0 16px 0', fontSize: '20px', fontWeight: '600' }}>Market Dashboard</h2>
-      <div style={{ 
-        padding: '40px 20px', 
-        textAlign: 'center', 
-        color: '#999', 
-        background: 'rgba(255, 255, 255, 0.05)', 
-        borderRadius: '8px'
-      }}>
-        <div style={{ fontSize: '36px', marginBottom: '10px' }}>📊</div>
-        <div style={{ fontWeight: '500', marginBottom: '10px', color: '#ccc' }}>Market Dashboard Feature</div>
-        <div style={{ fontSize: '14px', opacity: '0.8' }}>
-          Connect your Alpha Vantage API to see market data
-        </div>
-      </div>
-    </div>
-  );
-  
-  // Render chat tab
-  const renderChatTab = () => (
-    <div style={{ padding: '16px', paddingBottom: '100px' }}>
-      <h2 style={{ margin: '0 0 16px 0', fontSize: '20px', fontWeight: '600' }}>Rolo AI Assistant</h2>
-      <div style={{ 
-        padding: '40px 20px', 
-        textAlign: 'center', 
-        color: '#999', 
-        background: 'rgba(255, 255, 255, 0.05)', 
-        borderRadius: '8px'
-      }}>
-        <div style={{ fontSize: '36px', marginBottom: '10px' }}>💬</div>
-        <div style={{ fontWeight: '500', marginBottom: '10px', color: '#ccc' }}>Chat Feature</div>
-        <div style={{ fontSize: '14px', opacity: '0.8' }}>
-          Connect your Gemini API to enable AI assistant
-        </div>
-      </div>
-    </div>
-  );
-  
-  // Render active tab content
+  // Render active tab
   const renderActiveTab = () => {
     switch (activeTab) {
       case 'stocks':
         return renderStocksTab();
       case 'analysis':
-        return renderAnalysisTab();
+        return renderPlaceholder('Analysis', '🧠', 'Connect your AI API to enable analysis');
       case 'smartPlays':
-        return renderSmartPlaysTab();
+        return renderPlaceholder('Smart Plays', '🎯', 'Connect your Alpha Vantage API to see trading opportunities');
       case 'alerts':
-        return renderAlertsTab();
+        return renderPlaceholder('Real-Time Alerts', '🚨', 'Connect your API to see market alerts');
       case 'market':
-        return renderMarketTab();
+        return renderPlaceholder('Market Dashboard', '📊', 'Connect your API to see market data');
       case 'chat':
-        return renderChatTab();
+        return renderPlaceholder('Rolo AI Assistant', '💬', 'Connect your Gemini API to enable AI assistant');
       default:
         return renderStocksTab();
     }
@@ -354,108 +301,36 @@ export default function RoloApp() {
         padding: '8px 0',
         zIndex: 10
       }}>
-        <button 
-          onClick={() => setActiveTab('stocks')}
-          style={{
-            background: 'transparent',
-            border: 'none',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            color: activeTab === 'stocks' ? '#2196f3' : '#aaa',
-            fontSize: '20px',
-            cursor: 'pointer'
-          }}
-        >
-          <div style={{ marginBottom: '4px', fontSize: '20px' }}>📊</div>
-          <div style={{ fontSize: '12px' }}>Stocks</div>
-        </button>
-        
-        <button 
-          onClick={() => setActiveTab('analysis')}
-          style={{
-            background: 'transparent',
-            border: 'none',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            color: activeTab === 'analysis' ? '#2196f3' : '#aaa',
-            fontSize: '20px',
-            cursor: 'pointer'
-          }}
-        >
-          <div style={{ marginBottom: '4px', fontSize: '20px' }}>🧠</div>
-          <div style={{ fontSize: '12px' }}>Analysis</div>
-        </button>
-        
-        <button 
-          onClick={() => setActiveTab('smartPlays')}
-          style={{
-            background: 'transparent',
-            border: 'none',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            color: activeTab === 'smartPlays' ? '#2196f3' : '#aaa',
-            fontSize: '20px',
-            cursor: 'pointer'
-          }}
-        >
-          <div style={{ marginBottom: '4px', fontSize: '20px' }}>🎯</div>
-          <div style={{ fontSize: '12px' }}>Plays</div>
-        </button>
-        
-        <button 
-          onClick={() => setActiveTab('alerts')}
-          style={{
-            background: 'transparent',
-            border: 'none',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            color: activeTab === 'alerts' ? '#2196f3' : '#aaa',
-            fontSize: '20px',
-            cursor: 'pointer'
-          }}
-        >
-          <div style={{ marginBottom: '4px', fontSize: '20px' }}>🚨</div>
-          <div style={{ fontSize: '12px' }}>Alerts</div>
-        </button>
-        
-        <button 
-          onClick={() => setActiveTab('market')}
-          style={{
-            background: 'transparent',
-            border: 'none',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            color: activeTab === 'market' ? '#2196f3' : '#aaa',
-            fontSize: '20px',
-            cursor: 'pointer'
-          }}
-        >
-          <div style={{ marginBottom: '4px', fontSize: '20px' }}>🌎</div>
-          <div style={{ fontSize: '12px' }}>Market</div>
-        </button>
-        
-        <button 
-          onClick={() => setActiveTab('chat')}
-          style={{
-            background: 'transparent',
-            border: 'none',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            color: activeTab === 'chat' ? '#2196f3' : '#aaa',
-            fontSize: '20px',
-            cursor: 'pointer'
-          }}
-        >
-          <div style={{ marginBottom: '4px', fontSize: '20px' }}>💬</div>
-          <div style={{ fontSize: '12px' }}>Chat</div>
-        </button>
+        {[
+          { id: 'stocks', icon: '📊', label: 'Stocks' },
+          { id: 'analysis', icon: '🧠', label: 'Analysis' },
+          { id: 'smartPlays', icon: '🎯', label: 'Plays' },
+          { id: 'alerts', icon: '🚨', label: 'Alerts' },
+          { id: 'market', icon: '🌎', label: 'Market' },
+          { id: 'chat', icon: '💬', label: 'Chat' }
+        ].map(tab => (
+          <button 
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              color: activeTab === tab.id ? '#2196f3' : '#aaa',
+              fontSize: '20px',
+              cursor: 'pointer',
+              width: '45px'
+            }}
+          >
+            <div style={{ marginBottom: '4px', fontSize: '20px' }}>{tab.icon}</div>
+            <div style={{ fontSize: '12px' }}>{tab.label}</div>
+          </button>
+        ))}
       </nav>
     </div>
   );
 }
+
+export default RoloApp;
