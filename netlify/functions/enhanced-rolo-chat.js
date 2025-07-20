@@ -1,197 +1,183 @@
 // netlify/functions/enhanced-rolo-chat.js
-// AI-powered chat assistant with market awareness
+// AI-powered chat with context awareness - ZERO MOCK DATA
 
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 exports.handler = async (event, context) => {
-  const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'GET, OPTIONS',
-    'Content-Type': 'application/json'
-  };
+    const headers = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Content-Type': 'application/json'
+    };
 
-  if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 200, headers, body: '' };
-  }
+    if (event.httpMethod === 'OPTIONS') {
+        return { statusCode: 200, headers, body: '' };
+    }
 
-  try {
-    console.log(`[enhanced-rolo-chat.js] Processing chat request...`);
-    
-    // Get API key
-    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-    const ALPHA_VANTAGE_API_KEY = process.env.ALPHA_VANTAGE_API_KEY;
-    
-    if (!GEMINI_API_KEY) {
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({ 
-          error: 'Gemini API key not configured',
-          timestamp: new Date().toISOString()
-        })
-      };
+    if (event.httpMethod !== 'POST') {
+        return {
+            statusCode: 405,
+            headers,
+            body: JSON.stringify({ 
+                error: 'Method not allowed',
+                timestamp: new Date().toISOString()
+            })
+        };
     }
-    
-    // Get required parameters
-    const message = event.queryStringParameters?.message;
-    
-    if (!message) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ error: 'Message is required' })
-      };
-    }
-    
-    const symbol = event.queryStringParameters?.symbol;
-    const session = event.queryStringParameters?.session || 'MARKET_OPEN';
-    const contextStr = event.queryStringParameters?.context || '{}';
-    
-    let context = {};
+
     try {
-      context = JSON.parse(contextStr);
-    } catch (e) {
-      console.warn(`[enhanced-rolo-chat.js] Invalid context JSON: ${e.message}`);
-    }
-    
-    console.log(`[enhanced-rolo-chat.js] User message: "${message}", Symbol: ${symbol}, Session: ${session}`);
-    
-    // Fetch market data if needed
-    let marketData = {};
-    
-    if (symbol) {
-      try {
-        // Fetch stock data if a symbol is provided
-        const stockDataUrl = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${ALPHA_VANTAGE_API_KEY}`;
-        const stockResponse = await fetch(stockDataUrl);
+        const body = JSON.parse(event.body || '{}');
+        const message = body.message;
+        const context = body.context || {};
         
-        if (stockResponse.ok) {
-          const stockData = await stockResponse.json();
-          
-          if (stockData['Global Quote'] && stockData['Global Quote']['05. price']) {
-            marketData.stockData = {
-              symbol: symbol,
-              price: stockData['Global Quote']['05. price'],
-              change: stockData['Global Quote']['09. change'],
-              changePercent: stockData['Global Quote']['10. change percent'],
-              volume: stockData['Global Quote']['06. volume']
+        if (!message || typeof message !== 'string') {
+            return {
+                statusCode: 400,
+                headers,
+                body: JSON.stringify({ 
+                    error: 'Message is required',
+                    timestamp: new Date().toISOString()
+                })
             };
-          }
         }
-      } catch (stockError) {
-        console.warn(`[enhanced-rolo-chat.js] Error fetching stock data: ${stockError.message}`);
-      }
-    }
-    
-    // Fetch market index data
-    try {
-      const spyUrl = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=SPY&apikey=${ALPHA_VANTAGE_API_KEY}`;
-      const spyResponse = await fetch(spyUrl);
-      
-      if (spyResponse.ok) {
-        const spyData = await spyResponse.json();
+
+        console.log(`[enhanced-rolo-chat.js] Processing chat message: "${message.substring(0, 50)}..."`);
         
-        if (spyData['Global Quote'] && spyData['Global Quote']['05. price']) {
-          marketData.marketData = {
-            spy: {
-              price: spyData['Global Quote']['05. price'],
-              change: spyData['Global Quote']['09. change'],
-              changePercent: spyData['Global Quote']['10. change percent']
+        const GEMINI_KEY = process.env.GEMINI_API_KEY;
+        const ALPHA_VANTAGE_KEY = process.env.ALPHA_VANTAGE_API_KEY;
+        
+        if (!GEMINI_KEY) {
+            return {
+                statusCode: 500,
+                headers,
+                body: JSON.stringify({ 
+                    error: 'Gemini API key not configured',
+                    timestamp: new Date().toISOString()
+                })
+            };
+        }
+
+        // Initialize Gemini AI
+        const genAI = new GoogleGenerativeAI(GEMINI_KEY);
+        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+
+        // Build context-aware prompt with real data
+        let contextData = '';
+        
+        // Add selected stock context if available
+        if (context.selectedStock && context.stockData && context.stockData[context.selectedStock]) {
+            const stock = context.stockData[context.selectedStock];
+            contextData += `\nCURRENT STOCK CONTEXT (${context.selectedStock}):
+- Price: ${stock.price}
+- Change: ${stock.changePercent}
+- Volume: ${stock.volume ? stock.volume.toLocaleString() : 'N/A'}
+- Market Session: ${stock.marketSession || 'Unknown'}`;
+        }
+
+        // Add market data context if available
+        if (context.marketData && Object.keys(context.marketData).length > 0) {
+            contextData += `\nMARKET CONTEXT:`;
+            if (context.marketData.indices) {
+                Object.entries(context.marketData.indices).forEach(([index, data]) => {
+                    contextData += `\n- ${index}: ${data.changePercent || 'N/A'}`;
+                });
             }
-          };
+            if (context.marketData.vix) {
+                contextData += `\n- VIX: ${context.marketData.vix} (${context.marketData.marketMood || 'Unknown'})`;
+            }
         }
-      }
-    } catch (marketError) {
-      console.warn(`[enhanced-rolo-chat.js] Error fetching market data: ${marketError.message}`);
+
+        // Add recent alerts context if available
+        if (context.recentAlerts && context.recentAlerts.length > 0) {
+            contextData += `\nRECENT ALERTS:`;
+            context.recentAlerts.slice(0, 3).forEach(alert => {
+                contextData += `\n- ${alert.symbol || 'Market'}: ${alert.message || alert.type}`;
+            });
+        }
+
+        // Detect if user is asking about a specific stock
+        const stockSymbolMatch = message.match(/\b([A-Z]{1,5})\b/g);
+        let additionalStockData = '';
+        
+        if (stockSymbolMatch && ALPHA_VANTAGE_KEY) {
+            const symbol = stockSymbolMatch[0];
+            try {
+                console.log(`[enhanced-rolo-chat.js] Fetching real-time data for mentioned stock: ${symbol}`);
+                
+                const quoteUrl = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${ALPHA_VANTAGE_KEY}`;
+                const quoteResponse = await fetch(quoteUrl);
+                const quoteJson = await quoteResponse.json();
+                
+                if (quoteJson['Global Quote']) {
+                    const quote = quoteJson['Global Quote'];
+                    additionalStockData = `\nREAL-TIME DATA FOR ${symbol}:
+- Current Price: ${parseFloat(quote['05. price']).toFixed(2)}
+- Change: ${quote['10. change percent']}
+- Volume: ${parseInt(quote['06. volume']).toLocaleString()}
+- High: ${parseFloat(quote['03. high']).toFixed(2)}
+- Low: ${parseFloat(quote['04. low']).toFixed(2)}`;
+                }
+            } catch (stockError) {
+                console.warn(`[enhanced-rolo-chat.js] Could not fetch data for ${symbol}: ${stockError.message}`);
+            }
+        }
+
+        // Create comprehensive prompt
+        const prompt = `You are Rolo, an expert AI trading assistant. You provide helpful, accurate, and professional trading advice.
+
+USER MESSAGE: "${message}"
+
+${contextData}${additionalStockData}
+
+INSTRUCTIONS:
+- Be helpful and conversational while maintaining professional expertise
+- Use the real market data provided in your context when relevant
+- If asked about stocks, provide specific analysis based on real current data
+- If no real data is available, be honest about limitations
+- Keep responses concise but informative
+- Focus on actionable insights when possible
+- Never provide investment advice as "recommendations" - frame as educational analysis
+
+Respond as Rolo, the AI trading assistant:`;
+
+        console.log(`[enhanced-rolo-chat.js] Sending chat request to Gemini AI...`);
+        
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const aiResponse = response.text();
+
+        console.log(`[enhanced-rolo-chat.js] Generated AI response (${aiResponse.length} characters)`);
+
+        return {
+            statusCode: 200,
+            headers,
+            body: JSON.stringify({
+                response: aiResponse,
+                context: {
+                    hasStockContext: !!context.selectedStock,
+                    hasMarketContext: !!(context.marketData && Object.keys(context.marketData).length > 0),
+                    hasAlertsContext: !!(context.recentAlerts && context.recentAlerts.length > 0),
+                    additionalDataFetched: !!additionalStockData
+                },
+                timestamp: new Date().toISOString(),
+                dataSource: "Gemini AI with Real Market Context"
+            })
+        };
+
+    } catch (error) {
+        console.error('[enhanced-rolo-chat.js] Error:', error);
+        
+        return {
+            statusCode: 500,
+            headers,
+            body: JSON.stringify({
+                error: "Chat processing error",
+                details: error.message,
+                response: "I'm sorry, I encountered an error processing your message. Please try again.",
+                timestamp: new Date().toISOString(),
+                dataSource: "Error - Chat Failed"
+            })
+        };
     }
-    
-    // Initialize the Gemini AI model
-    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-    
-    // Create system prompt with market awareness
-    const systemPrompt = `
-You are Rolo AI, a sophisticated AI assistant specializing in stock market analysis and trading.
-Current date: ${new Date().toLocaleDateString()}
-Current market session: ${session}
-${symbol ? `User is currently viewing: ${symbol}` : ''}
-
-MARKET DATA:
-${JSON.stringify(marketData, null, 2)}
-
-USER CONTEXT:
-${JSON.stringify(context, null, 2)}
-
-PERSONALITY AND STYLE:
-- You are knowledgeable but conversational and friendly
-- You provide clear, concise, and actionable advice
-- You avoid financial jargon unless necessary and explain complex concepts simply
-- You never make promises about future performance or give financial advice that could be construed as legally binding
-- You are confident in your analysis but acknowledge limitations and uncertainties
-- You always use numerals for numbers (42 not forty-two)
-- You make frequent references to current market conditions based on the data provided
-- You're helpful and willing to answer follow-up questions
-
-RESPONSE GUIDELINES:
-- Keep responses concise and focused (maximum 3-4 paragraphs)
-- If referring to stock prices or market indexes, mention the current values from the provided data
-- If the user asks about a specific stock, acknowledge the market session (open, pre-market, after-hours, etc.)
-- Avoid making specific price predictions or guarantees
-- Always include appropriate disclaimers when discussing investment decisions
-- When appropriate, suggest resources or tools that might help the user further
-
-IMPORTANT ETHICS RULES:
-- Never recommend specific trades with specific dollar amounts
-- Always clarify that you are providing general information, not personalized financial advice
-- Remind users to do their own research and consult with financial professionals for investment decisions
-- Do not encourage day trading, margin trading, or other high-risk activities
-- Do not attempt to time the market or suggest "sure things"
-
-Now respond to the user's message in a helpful, informative way, keeping in mind the market context provided.
-`;
-
-    // Generate chat response
-    const result = await model.generateContent({
-      contents: [
-        { role: "user", parts: [{ text: systemPrompt }] },
-        { role: "model", parts: [{ text: "I understand my role as Rolo AI. I'll provide helpful market insights while following the guidelines. What would you like to know?" }] },
-        { role: "user", parts: [{ text: message }] }
-      ],
-      generationConfig: {
-        temperature: 0.7,
-        maxOutputTokens: 800,
-      },
-    });
-
-    const response = await result.response;
-    const text = response.text();
-    
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify({
-        response: text,
-        timestamp: new Date().toISOString(),
-        context: {
-          symbol,
-          session,
-          hasMarketData: Object.keys(marketData).length > 0
-        }
-      })
-    };
-    
-  } catch (error) {
-    console.error('[enhanced-rolo-chat.js] Error:', error);
-    
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({
-        error: "Chat generation failed",
-        details: error.message,
-        timestamp: new Date().toISOString()
-      })
-    };
-  }
 };
