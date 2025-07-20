@@ -1,5 +1,5 @@
 // netlify/functions/enhanced-rolo-chat.js
-// AI-powered chat with context awareness - ZERO MOCK DATA
+// AI-powered chat with context awareness - ZERO MOCK DATA - FINAL FIX
 
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
@@ -20,23 +20,36 @@ exports.handler = async (event, context) => {
             statusCode: 405,
             headers,
             body: JSON.stringify({ 
-                error: 'Method not allowed',
+                error: 'Method not allowed - use POST',
                 timestamp: new Date().toISOString()
             })
         };
     }
 
     try {
-        const body = JSON.parse(event.body || '{}');
-        const message = body.message;
-        const context = body.context || {};
-        
-        if (!message || typeof message !== 'string') {
+        let body;
+        try {
+            body = JSON.parse(event.body || '{}');
+        } catch (parseError) {
             return {
                 statusCode: 400,
                 headers,
                 body: JSON.stringify({ 
-                    error: 'Message is required',
+                    error: 'Invalid JSON in request body',
+                    timestamp: new Date().toISOString()
+                })
+            };
+        }
+
+        const message = body.message;
+        const context = body.context || {};
+        
+        if (!message || typeof message !== 'string' || !message.trim()) {
+            return {
+                statusCode: 400,
+                headers,
+                body: JSON.stringify({ 
+                    error: 'Message is required and must be a non-empty string',
                     timestamp: new Date().toISOString()
                 })
             };
@@ -53,6 +66,7 @@ exports.handler = async (event, context) => {
                 headers,
                 body: JSON.stringify({ 
                     error: 'Gemini API key not configured',
+                    response: 'Sorry, AI chat is not available right now. Please try again later.',
                     timestamp: new Date().toISOString()
                 })
             };
@@ -66,21 +80,27 @@ exports.handler = async (event, context) => {
         let contextData = '';
         
         // Add selected stock context if available
-        if (context.selectedStock && context.stockData && context.stockData[context.selectedStock]) {
-            const stock = context.stockData[context.selectedStock];
-            contextData += `\nCURRENT STOCK CONTEXT (${context.selectedStock}):
-- Price: ${stock.price}
-- Change: ${stock.changePercent}
-- Volume: ${stock.volume ? stock.volume.toLocaleString() : 'N/A'}
-- Market Session: ${stock.marketSession || 'Unknown'}`;
+        if (context.selectedStock && context.stockData && Object.keys(context.stockData).length > 0) {
+            const stock = context.stockData;
+            contextData += `\nCURRENT STOCK CONTEXT (${context.selectedStock}):`;
+            if (stock.price) contextData += `\n- Price: ${typeof stock.price === 'number' ? '$' + stock.price.toFixed(2) : stock.price}`;
+            if (stock.changePercent) contextData += `\n- Change: ${stock.changePercent}`;
+            if (stock.volume) contextData += `\n- Volume: ${typeof stock.volume === 'number' ? stock.volume.toLocaleString() : stock.volume}`;
+            if (stock.marketSession) contextData += `\n- Market Session: ${stock.marketSession}`;
         }
 
         // Add market data context if available
         if (context.marketData && Object.keys(context.marketData).length > 0) {
             contextData += `\nMARKET CONTEXT:`;
-            if (context.marketData.indices) {
+            if (context.marketData.session) {
+                contextData += `\n- Market Session: ${context.marketData.session}`;
+            }
+            if (context.marketData.indices && Object.keys(context.marketData.indices).length > 0) {
+                contextData += `\n- Major Indices:`;
                 Object.entries(context.marketData.indices).forEach(([index, data]) => {
-                    contextData += `\n- ${index}: ${data.changePercent || 'N/A'}`;
+                    if (data && data.changePercent) {
+                        contextData += `\n  - ${index}: ${data.changePercent}`;
+                    }
                 });
             }
             if (context.marketData.vix) {
@@ -89,14 +109,16 @@ exports.handler = async (event, context) => {
         }
 
         // Add recent alerts context if available
-        if (context.recentAlerts && context.recentAlerts.length > 0) {
+        if (context.recentAlerts && Array.isArray(context.recentAlerts) && context.recentAlerts.length > 0) {
             contextData += `\nRECENT ALERTS:`;
             context.recentAlerts.slice(0, 3).forEach(alert => {
-                contextData += `\n- ${alert.symbol || 'Market'}: ${alert.message || alert.type}`;
+                if (alert && (alert.message || alert.type)) {
+                    contextData += `\n- ${alert.symbol || 'Market'}: ${alert.message || alert.type}`;
+                }
             });
         }
 
-        // Detect if user is asking about a specific stock
+        // Detect if user is asking about a specific stock and fetch real-time data
         const stockSymbolMatch = message.match(/\b([A-Z]{1,5})\b/g);
         let additionalStockData = '';
         
@@ -107,16 +129,19 @@ exports.handler = async (event, context) => {
                 
                 const quoteUrl = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${ALPHA_VANTAGE_KEY}`;
                 const quoteResponse = await fetch(quoteUrl);
-                const quoteJson = await quoteResponse.json();
                 
-                if (quoteJson['Global Quote']) {
-                    const quote = quoteJson['Global Quote'];
-                    additionalStockData = `\nREAL-TIME DATA FOR ${symbol}:
-- Current Price: ${parseFloat(quote['05. price']).toFixed(2)}
-- Change: ${quote['10. change percent']}
-- Volume: ${parseInt(quote['06. volume']).toLocaleString()}
-- High: ${parseFloat(quote['03. high']).toFixed(2)}
-- Low: ${parseFloat(quote['04. low']).toFixed(2)}`;
+                if (quoteResponse.ok) {
+                    const quoteJson = await quoteResponse.json();
+                    
+                    if (quoteJson['Global Quote']) {
+                        const quote = quoteJson['Global Quote'];
+                        additionalStockData = `\nREAL-TIME DATA FOR ${symbol}:`;
+                        additionalStockData += `\n- Current Price: $${parseFloat(quote['05. price']).toFixed(2)}`;
+                        additionalStockData += `\n- Change: ${quote['10. change percent']}`;
+                        additionalStockData += `\n- Volume: ${parseInt(quote['06. volume']).toLocaleString()}`;
+                        additionalStockData += `\n- High: $${parseFloat(quote['03. high']).toFixed(2)}`;
+                        additionalStockData += `\n- Low: $${parseFloat(quote['04. low']).toFixed(2)}`;
+                    }
                 }
             } catch (stockError) {
                 console.warn(`[enhanced-rolo-chat.js] Could not fetch data for ${symbol}: ${stockError.message}`);
@@ -135,9 +160,11 @@ INSTRUCTIONS:
 - Use the real market data provided in your context when relevant
 - If asked about stocks, provide specific analysis based on real current data
 - If no real data is available, be honest about limitations
-- Keep responses concise but informative
+- Keep responses concise but informative (2-3 paragraphs max)
 - Focus on actionable insights when possible
 - Never provide investment advice as "recommendations" - frame as educational analysis
+- If asked about market conditions, reference the real VIX and market session data
+- If market is closed, acknowledge current session and discuss what to watch for next session
 
 Respond as Rolo, the AI trading assistant:`;
 
@@ -155,10 +182,11 @@ Respond as Rolo, the AI trading assistant:`;
             body: JSON.stringify({
                 response: aiResponse,
                 context: {
-                    hasStockContext: !!context.selectedStock,
+                    hasStockContext: !!(context.selectedStock && context.stockData),
                     hasMarketContext: !!(context.marketData && Object.keys(context.marketData).length > 0),
                     hasAlertsContext: !!(context.recentAlerts && context.recentAlerts.length > 0),
-                    additionalDataFetched: !!additionalStockData
+                    additionalDataFetched: !!additionalStockData,
+                    processedMessage: message.substring(0, 50) + (message.length > 50 ? '...' : '')
                 },
                 timestamp: new Date().toISOString(),
                 dataSource: "Gemini AI with Real Market Context"
@@ -174,7 +202,7 @@ Respond as Rolo, the AI trading assistant:`;
             body: JSON.stringify({
                 error: "Chat processing error",
                 details: error.message,
-                response: "I'm sorry, I encountered an error processing your message. Please try again.",
+                response: "I'm sorry, I encountered an error processing your message. Please try again in a moment.",
                 timestamp: new Date().toISOString(),
                 dataSource: "Error - Chat Failed"
             })
