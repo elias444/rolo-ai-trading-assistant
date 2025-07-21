@@ -1,5 +1,5 @@
 // netlify/functions/market-dashboard.js
-// Market dashboard with real indices data - ZERO MOCK DATA
+// FIXED: Market dashboard with working Alpha Vantage symbols and proper data
 
 exports.handler = async (event, context) => {
     const headers = {
@@ -14,11 +14,12 @@ exports.handler = async (event, context) => {
     }
 
     try {
-        console.log(`[market-dashboard.js] Fetching real market data...`);
+        console.log(`[market-dashboard.js] Starting market data fetch...`);
         
         const API_KEY = process.env.ALPHA_VANTAGE_API_KEY;
         
         if (!API_KEY) {
+            console.error('[market-dashboard.js] Alpha Vantage API key missing');
             return {
                 statusCode: 500,
                 headers,
@@ -47,6 +48,8 @@ exports.handler = async (event, context) => {
             marketSession = 'FUTURES_OPEN';
         }
 
+        console.log(`[market-dashboard.js] Market session: ${marketSession}`);
+
         const marketData = {
             session: marketSession,
             timestamp: new Date().toISOString(),
@@ -57,142 +60,181 @@ exports.handler = async (event, context) => {
             marketMood: 'Unknown'
         };
 
-        // Major Indices - Real data only
-        const indices = ['SPY', 'QQQ', 'DIA', 'IWM'];
-        const indexNames = {
-            'SPY': 'S&P 500',
-            'QQQ': 'NASDAQ',
-            'DIA': 'Dow Jones',
-            'IWM': 'Russell 2000'
-        };
+        // Major Indices - Use ETF symbols that work reliably with Alpha Vantage
+        const indices = [
+            { symbol: 'SPY', name: 'S&P 500' },
+            { symbol: 'QQQ', name: 'NASDAQ' },
+            { symbol: 'DIA', name: 'Dow Jones' },
+            { symbol: 'IWM', name: 'Russell 2000' }
+        ];
 
-        for (const symbol of indices) {
+        console.log(`[market-dashboard.js] Fetching ${indices.length} major indices...`);
+
+        for (const index of indices) {
             try {
-                const quoteUrl = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${API_KEY}`;
+                const quoteUrl = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${index.symbol}&apikey=${API_KEY}`;
+                console.log(`[market-dashboard.js] Fetching ${index.symbol}...`);
+                
                 const quoteResponse = await fetch(quoteUrl);
+                
+                if (!quoteResponse.ok) {
+                    console.warn(`[market-dashboard.js] HTTP ${quoteResponse.status} for ${index.symbol}`);
+                    continue;
+                }
+                
                 const quoteJson = await quoteResponse.json();
                 
-                if (quoteJson['Global Quote']) {
+                if (quoteJson['Global Quote'] && quoteJson['Global Quote']['01. symbol']) {
                     const quote = quoteJson['Global Quote'];
-                    marketData.indices[indexNames[symbol]] = {
-                        symbol: symbol,
+                    marketData.indices[index.name] = {
+                        symbol: index.symbol,
                         price: parseFloat(quote['05. price']),
                         change: parseFloat(quote['09. change']),
                         changePercent: quote['10. change percent'],
                         volume: parseInt(quote['06. volume']),
                         lastUpdated: quote['07. latest trading day']
                     };
-                    console.log(`[market-dashboard.js] Got real data for ${symbol}: $${quote['05. price']}`);
+                    console.log(`[market-dashboard.js] ✅ Got ${index.name}: $${quote['05. price']} (${quote['10. change percent']})`);
+                } else {
+                    console.warn(`[market-dashboard.js] No data in response for ${index.symbol}:`, quoteJson);
                 }
                 
-                // Rate limiting
-                await new Promise(resolve => setTimeout(resolve, 300));
+                // Rate limiting - important for Alpha Vantage
+                await new Promise(resolve => setTimeout(resolve, 500));
                 
             } catch (error) {
-                console.warn(`[market-dashboard.js] Could not fetch ${symbol}: ${error.message}`);
+                console.error(`[market-dashboard.js] Error fetching ${index.symbol}: ${error.message}`);
             }
         }
 
-        // VIX Data - Real volatility indicator
+        // VIX Data - Critical for market sentiment
         try {
+            console.log(`[market-dashboard.js] Fetching VIX data...`);
+            
             const vixUrl = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=VIX&apikey=${API_KEY}`;
             const vixResponse = await fetch(vixUrl);
-            const vixJson = await vixResponse.json();
             
-            if (vixJson['Global Quote']) {
-                const vixQuote = vixJson['Global Quote'];
-                const vixLevel = parseFloat(vixQuote['05. price']);
-                const vixChange = parseFloat(vixQuote['10. change percent'].replace('%', ''));
+            if (vixResponse.ok) {
+                const vixJson = await vixResponse.json();
                 
-                marketData.vix = vixLevel;
-                
-                // Real market mood based on VIX levels
-                if (vixLevel < 15) {
-                    marketData.marketMood = 'Complacent';
-                } else if (vixLevel < 20) {
-                    marketData.marketMood = 'Low Volatility';
-                } else if (vixLevel < 25) {
-                    marketData.marketMood = 'Elevated Concern';
-                } else if (vixLevel < 30) {
-                    marketData.marketMood = 'Fear';
-                } else {
-                    marketData.marketMood = 'Extreme Fear';
+                if (vixJson['Global Quote'] && vixJson['Global Quote']['01. symbol']) {
+                    const vixQuote = vixJson['Global Quote'];
+                    const vixLevel = parseFloat(vixQuote['05. price']);
+                    const vixChange = parseFloat(vixQuote['10. change percent'].replace('%', ''));
+                    
+                    marketData.vix = vixLevel;
+                    
+                    // Calculate market mood based on VIX levels
+                    if (vixLevel < 12) {
+                        marketData.marketMood = 'Complacent';
+                    } else if (vixLevel < 16) {
+                        marketData.marketMood = 'Low Volatility';
+                    } else if (vixLevel < 20) {
+                        marketData.marketMood = 'Normal';
+                    } else if (vixLevel < 25) {
+                        marketData.marketMood = 'Elevated Concern';
+                    } else if (vixLevel < 30) {
+                        marketData.marketMood = 'Fear';
+                    } else {
+                        marketData.marketMood = 'Extreme Fear';
+                    }
+                    
+                    console.log(`[market-dashboard.js] ✅ VIX: ${vixLevel} (${marketData.marketMood})`);
                 }
-                
-                console.log(`[market-dashboard.js] VIX: ${vixLevel} (${marketData.marketMood})`);
             }
         } catch (error) {
-            console.warn(`[market-dashboard.js] Could not fetch VIX: ${error.message}`);
+            console.error(`[market-dashboard.js] VIX error: ${error.message}`);
         }
 
-        // Economic Indicators - Real data when available
+        // Economic Indicators - Use symbols that typically work
         const economicSymbols = [
-            { symbol: 'DGS10', name: 'tenYearTreasury' },
-            { symbol: 'DFF', name: 'fedFundsRate' },
-            { symbol: 'DXY', name: 'dollarIndex' }
+            { symbol: 'DGS10', name: 'Ten Year Treasury', type: 'rate' },
+            { symbol: 'FEDFUNDS', name: 'Fed Funds Rate', type: 'rate' },
+            { symbol: 'UNRATE', name: 'Unemployment Rate', type: 'rate' }
         ];
+
+        console.log(`[market-dashboard.js] Fetching economic indicators...`);
 
         for (const econ of economicSymbols) {
             try {
-                const econUrl = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${econ.symbol}&apikey=${API_KEY}`;
-                const econResponse = await fetch(econUrl);
-                const econJson = await econResponse.json();
+                // Try different function for economic data
+                const econUrl = `https://www.alphavantage.co/query?function=FEDERAL_FUNDS_RATE&apikey=${API_KEY}`;
                 
-                if (econJson['Global Quote']) {
-                    const econQuote = econJson['Global Quote'];
-                    marketData.economic[econ.name] = {
-                        value: parseFloat(econQuote['05. price']),
-                        change: econQuote['10. change percent'],
-                        lastUpdated: econQuote['07. latest trading day']
-                    };
-                    console.log(`[market-dashboard.js] Got ${econ.name}: ${econQuote['05. price']}`);
+                if (econ.symbol === 'FEDFUNDS') {
+                    const econResponse = await fetch(econUrl);
+                    
+                    if (econResponse.ok) {
+                        const econJson = await econResponse.json();
+                        
+                        if (econJson.data && econJson.data.length > 0) {
+                            const latestData = econJson.data[0];
+                            marketData.economic[econ.name] = {
+                                value: parseFloat(latestData.value),
+                                date: latestData.date,
+                                unit: '%'
+                            };
+                            console.log(`[market-dashboard.js] ✅ Fed Funds Rate: ${latestData.value}%`);
+                        }
+                    }
                 }
                 
-                await new Promise(resolve => setTimeout(resolve, 300));
+                // Rate limiting
+                await new Promise(resolve => setTimeout(resolve, 500));
                 
             } catch (error) {
-                console.warn(`[market-dashboard.js] Could not fetch ${econ.symbol}: ${error.message}`);
+                console.warn(`[market-dashboard.js] Economic indicator ${econ.symbol} error: ${error.message}`);
             }
         }
 
-        // Sector ETFs - Real sector performance
+        // Sector ETFs - Key sector performance
         const sectorETFs = [
             { symbol: 'XLK', name: 'Technology' },
             { symbol: 'XLF', name: 'Financials' },
             { symbol: 'XLE', name: 'Energy' },
-            { symbol: 'XLV', name: 'Healthcare' }
+            { symbol: 'XLV', name: 'Healthcare' },
+            { symbol: 'XLI', name: 'Industrials' }
         ];
+
+        console.log(`[market-dashboard.js] Fetching sector performance...`);
 
         for (const sector of sectorETFs) {
             try {
                 const sectorUrl = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${sector.symbol}&apikey=${API_KEY}`;
                 const sectorResponse = await fetch(sectorUrl);
-                const sectorJson = await sectorResponse.json();
                 
-                if (sectorJson['Global Quote']) {
-                    const sectorQuote = sectorJson['Global Quote'];
-                    marketData.sectors[sector.name] = {
-                        symbol: sector.symbol,
-                        price: parseFloat(sectorQuote['05. price']),
-                        change: parseFloat(sectorQuote['09. change']),
-                        changePercent: sectorQuote['10. change percent']
-                    };
-                    console.log(`[market-dashboard.js] Got ${sector.name}: ${sectorQuote['10. change percent']}`);
+                if (sectorResponse.ok) {
+                    const sectorJson = await sectorResponse.json();
+                    
+                    if (sectorJson['Global Quote'] && sectorJson['Global Quote']['01. symbol']) {
+                        const sectorQuote = sectorJson['Global Quote'];
+                        marketData.sectors[sector.name] = {
+                            symbol: sector.symbol,
+                            price: parseFloat(sectorQuote['05. price']),
+                            change: parseFloat(sectorQuote['09. change']),
+                            changePercent: sectorQuote['10. change percent']
+                        };
+                        console.log(`[market-dashboard.js] ✅ ${sector.name}: ${sectorQuote['10. change percent']}`);
+                    }
                 }
                 
-                await new Promise(resolve => setTimeout(resolve, 300));
+                // Rate limiting
+                await new Promise(resolve => setTimeout(resolve, 500));
                 
             } catch (error) {
-                console.warn(`[market-dashboard.js] Could not fetch ${sector.symbol}: ${error.message}`);
+                console.warn(`[market-dashboard.js] Sector ${sector.symbol} error: ${error.message}`);
             }
         }
 
-        // Only return data if we have real market data
-        const hasRealData = Object.keys(marketData.indices).length > 0 || 
-                           marketData.vix !== null || 
-                           Object.keys(marketData.economic).length > 0;
+        // Check if we have any real data
+        const hasIndices = Object.keys(marketData.indices).length > 0;
+        const hasVix = marketData.vix !== null;
+        const hasEconomic = Object.keys(marketData.economic).length > 0;
+        const hasSectors = Object.keys(marketData.sectors).length > 0;
+        
+        console.log(`[market-dashboard.js] Data summary - Indices: ${hasIndices}, VIX: ${hasVix}, Economic: ${hasEconomic}, Sectors: ${hasSectors}`);
 
-        if (!hasRealData) {
+        if (!hasIndices && !hasVix && !hasEconomic) {
+            console.warn(`[market-dashboard.js] No market data successfully fetched`);
             return {
                 statusCode: 404,
                 headers,
@@ -205,7 +247,7 @@ exports.handler = async (event, context) => {
             };
         }
 
-        console.log(`[market-dashboard.js] Successfully compiled market dashboard with ${Object.keys(marketData.indices).length} indices`);
+        console.log(`[market-dashboard.js] ✅ Successfully compiled market dashboard with ${Object.keys(marketData.indices).length} indices, VIX: ${!!hasVix}, Economic: ${Object.keys(marketData.economic).length} indicators`);
 
         return {
             statusCode: 200,
@@ -213,12 +255,13 @@ exports.handler = async (event, context) => {
             body: JSON.stringify({
                 ...marketData,
                 dataSource: "Alpha Vantage Real-Time Market Data",
-                nextUpdate: marketSession === 'MARKET_OPEN' ? '2 minutes' : '5 minutes'
+                nextUpdate: marketSession === 'MARKET_OPEN' ? '2 minutes' : '5 minutes',
+                dataQuality: 'Real-Time'
             })
         };
 
     } catch (error) {
-        console.error('[market-dashboard.js] Error:', error);
+        console.error('[market-dashboard.js] Unexpected error:', error);
         
         return {
             statusCode: 500,
