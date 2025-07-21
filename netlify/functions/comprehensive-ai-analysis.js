@@ -1,6 +1,5 @@
 // netlify/functions/comprehensive-ai-analysis.js
-// COMPLETE: Working comprehensive AI analysis with ALL data sources
-// ZERO MOCK DATA - Only uses real Alpha Vantage and Gemini data
+// FIXED: HTTP 500 error and working comprehensive AI analysis
 
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
@@ -17,76 +16,68 @@ exports.handler = async (event, context) => {
     }
 
     try {
-        console.log(`[comprehensive-ai-analysis.js] Starting comprehensive analysis...`);
+        console.log(`[comprehensive-ai-analysis.js] Starting analysis...`);
         
-        // Get API keys
+        // Get API keys with validation
         const ALPHA_VANTAGE_KEY = process.env.ALPHA_VANTAGE_API_KEY;
         const GEMINI_KEY = process.env.GEMINI_API_KEY;
         
-        if (!ALPHA_VANTAGE_KEY || !GEMINI_KEY) {
+        if (!ALPHA_VANTAGE_KEY) {
+            console.error('[comprehensive-ai-analysis.js] Alpha Vantage API key missing');
             return {
                 statusCode: 500,
                 headers,
                 body: JSON.stringify({ 
-                    error: 'API keys not configured',
+                    error: 'Alpha Vantage API key not configured',
                     analysis: null,
-                    timestamp: new Date().toISOString(),
-                    dataSource: "Error - No API Keys"
+                    timestamp: new Date().toISOString()
+                })
+            };
+        }
+
+        if (!GEMINI_KEY) {
+            console.error('[comprehensive-ai-analysis.js] Gemini API key missing');
+            return {
+                statusCode: 500,
+                headers,
+                body: JSON.stringify({ 
+                    error: 'Gemini API key not configured',
+                    analysis: null,
+                    timestamp: new Date().toISOString()
                 })
             };
         }
         
-        // Parse request
-        let symbol = 'SPY';
-        let analysisType = 'analysis';
+        // Parse symbol from request
+        let symbol = 'SPY'; // Default symbol
         
-        if (event.httpMethod === 'POST' && event.body) {
-            const body = JSON.parse(event.body);
-            symbol = body.symbol || 'SPY';
-            analysisType = body.type || 'analysis';
-        } else if (event.queryStringParameters) {
-            symbol = event.queryStringParameters.symbol || 'SPY';
-            analysisType = event.queryStringParameters.type || 'analysis';
+        if (event.queryStringParameters && event.queryStringParameters.symbol) {
+            symbol = event.queryStringParameters.symbol.toUpperCase();
+        } else if (event.httpMethod === 'POST' && event.body) {
+            try {
+                const body = JSON.parse(event.body);
+                symbol = body.symbol ? body.symbol.toUpperCase() : 'SPY';
+            } catch (parseError) {
+                console.warn('[comprehensive-ai-analysis.js] Could not parse POST body, using default symbol');
+            }
         }
         
-        console.log(`[comprehensive-ai-analysis.js] Analyzing ${symbol}, type: ${analysisType}`);
+        console.log(`[comprehensive-ai-analysis.js] Analyzing symbol: ${symbol}`);
         
-        // Determine current market session
-        const now = new Date();
-        const currentTime = now.getHours() * 60 + now.getMinutes();
-        const dayOfWeek = now.getDay();
-        
-        let marketSession = 'CLOSED';
-        if (dayOfWeek === 0 || dayOfWeek === 6) {
-            marketSession = 'WEEKEND';
-        } else if (currentTime >= 930 && currentTime < 1600) {
-            marketSession = 'MARKET_OPEN';
-        } else if (currentTime >= 400 && currentTime < 930) {
-            marketSession = 'PRE_MARKET';
-        } else if (currentTime >= 1600 && currentTime < 2000) {
-            marketSession = 'AFTER_HOURS';
-        } else {
-            marketSession = 'FUTURES_OPEN';
-        }
-        
-        // Collect REAL market data
-        const marketData = {
-            session: marketSession,
-            timestamp: new Date().toISOString()
-        };
-        
+        // Step 1: Get real stock data
         let stockData = null;
-        let technicalData = null;
-        let newsData = null;
-        let sectorData = null;
-        
-        // 1. Get Real Stock Data
         try {
             const quoteUrl = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${ALPHA_VANTAGE_KEY}`;
+            console.log(`[comprehensive-ai-analysis.js] Fetching stock data for ${symbol}...`);
+            
             const quoteResponse = await fetch(quoteUrl);
+            if (!quoteResponse.ok) {
+                throw new Error(`Alpha Vantage API returned ${quoteResponse.status}`);
+            }
+            
             const quoteJson = await quoteResponse.json();
             
-            if (quoteJson['Global Quote']) {
+            if (quoteJson['Global Quote'] && quoteJson['Global Quote']['01. symbol']) {
                 const quote = quoteJson['Global Quote'];
                 stockData = {
                     symbol: quote['01. symbol'],
@@ -99,166 +90,151 @@ exports.handler = async (event, context) => {
                     previousClose: parseFloat(quote['08. previous close']),
                     lastUpdated: quote['07. latest trading day']
                 };
-                console.log(`[comprehensive-ai-analysis.js] Got real stock data for ${symbol}`);
-            }
-        } catch (error) {
-            console.warn(`[comprehensive-ai-analysis.js] Stock data error: ${error.message}`);
-        }
-        
-        // 2. Get Real Technical Indicators
-        try {
-            const rsiUrl = `https://www.alphavantage.co/query?function=RSI&symbol=${symbol}&interval=daily&time_period=14&series_type=close&apikey=${ALPHA_VANTAGE_KEY}`;
-            const rsiResponse = await fetch(rsiUrl);
-            const rsiJson = await rsiResponse.json();
-            
-            if (rsiJson['Technical Analysis: RSI']) {
-                const rsiData = rsiJson['Technical Analysis: RSI'];
-                const latestDate = Object.keys(rsiData)[0];
-                const rsiValue = parseFloat(rsiData[latestDate]['RSI']);
-                
-                technicalData = {
-                    rsi: rsiValue,
-                    rsiSignal: rsiValue > 70 ? 'Overbought' : rsiValue < 30 ? 'Oversold' : 'Neutral',
-                    date: latestDate
+                console.log(`[comprehensive-ai-analysis.js] Got stock data: ${symbol} at $${stockData.price}`);
+            } else {
+                console.warn(`[comprehensive-ai-analysis.js] No stock data returned for ${symbol}`);
+                // Return a basic response instead of throwing an error
+                return {
+                    statusCode: 200,
+                    headers,
+                    body: JSON.stringify({
+                        error: `No real data available for ${symbol}`,
+                        analysis: null,
+                        timestamp: new Date().toISOString(),
+                        dataSource: "Alpha Vantage - No Data"
+                    })
                 };
-                console.log(`[comprehensive-ai-analysis.js] Got real RSI data: ${rsiValue}`);
             }
-        } catch (error) {
-            console.warn(`[comprehensive-ai-analysis.js] Technical data error: ${error.message}`);
+        } catch (stockError) {
+            console.error(`[comprehensive-ai-analysis.js] Stock data error: ${stockError.message}`);
+            return {
+                statusCode: 500,
+                headers,
+                body: JSON.stringify({
+                    error: `Failed to fetch stock data: ${stockError.message}`,
+                    analysis: null,
+                    timestamp: new Date().toISOString()
+                })
+            };
         }
-        
-        // 3. Get Real Market News (if available)
-        try {
-            const newsUrl = `https://www.alphavantage.co/query?function=NEWS_SENTIMENT&tickers=${symbol}&apikey=${ALPHA_VANTAGE_KEY}`;
-            const newsResponse = await fetch(newsUrl);
-            const newsJson = await newsResponse.json();
-            
-            if (newsJson.feed && newsJson.feed.length > 0) {
-                const recentNews = newsJson.feed.slice(0, 3);
-                newsData = {
-                    articles: recentNews.map(article => ({
-                        title: article.title,
-                        sentiment: article.overall_sentiment_label,
-                        score: article.overall_sentiment_score,
-                        summary: article.summary
-                    })),
-                    overallSentiment: newsJson.feed[0].overall_sentiment_label
-                };
-                console.log(`[comprehensive-ai-analysis.js] Got real news data: ${newsData.overallSentiment}`);
-            }
-        } catch (error) {
-            console.warn(`[comprehensive-ai-analysis.js] News data error: ${error.message}`);
-        }
-        
-        // 4. Get VIX for Market Context (if not analyzing VIX itself)
+
+        // Step 2: Get VIX for market context (if not analyzing VIX itself)
         let vixData = null;
         if (symbol !== 'VIX') {
             try {
                 const vixUrl = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=VIX&apikey=${ALPHA_VANTAGE_KEY}`;
                 const vixResponse = await fetch(vixUrl);
-                const vixJson = await vixResponse.json();
                 
-                if (vixJson['Global Quote']) {
-                    const vixQuote = vixJson['Global Quote'];
-                    vixData = {
-                        level: parseFloat(vixQuote['05. price']),
-                        change: parseFloat(vixQuote['10. change percent'].replace('%', '')),
-                        fearGreed: parseFloat(vixQuote['05. price']) > 30 ? 'Fear' : 'Greed'
-                    };
-                    console.log(`[comprehensive-ai-analysis.js] Got real VIX data: ${vixData.level}`);
+                if (vixResponse.ok) {
+                    const vixJson = await vixResponse.json();
+                    if (vixJson['Global Quote']) {
+                        const vixQuote = vixJson['Global Quote'];
+                        vixData = {
+                            level: parseFloat(vixQuote['05. price']),
+                            change: parseFloat(vixQuote['10. change percent'].replace('%', '')),
+                            fearGreed: parseFloat(vixQuote['05. price']) > 30 ? 'Fear' : 
+                                      parseFloat(vixQuote['05. price']) > 20 ? 'Elevated' : 'Greed'
+                        };
+                        console.log(`[comprehensive-ai-analysis.js] Got VIX data: ${vixData.level}`);
+                    }
                 }
-            } catch (error) {
-                console.warn(`[comprehensive-ai-analysis.js] VIX data error: ${error.message}`);
+            } catch (vixError) {
+                console.warn(`[comprehensive-ai-analysis.js] VIX data error: ${vixError.message}`);
             }
         }
-        
-        // Only proceed with AI analysis if we have real data
-        if (!stockData) {
+
+        // Step 3: Initialize Gemini AI
+        let genAI, model;
+        try {
+            genAI = new GoogleGenerativeAI(GEMINI_KEY);
+            model = genAI.getGenerativeModel({ model: "gemini-pro" });
+            console.log(`[comprehensive-ai-analysis.js] Initialized Gemini AI`);
+        } catch (aiError) {
+            console.error(`[comprehensive-ai-analysis.js] Gemini initialization error: ${aiError.message}`);
             return {
-                statusCode: 200,
+                statusCode: 500,
                 headers,
                 body: JSON.stringify({
-                    error: "No real stock data available",
+                    error: `AI initialization failed: ${aiError.message}`,
                     analysis: null,
-                    timestamp: new Date().toISOString(),
-                    dataSource: "Error - No Real Data"
+                    timestamp: new Date().toISOString()
                 })
             };
         }
-        
-        // Initialize Gemini AI
-        const genAI = new GoogleGenerativeAI(GEMINI_KEY);
-        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-        
-        // Create comprehensive prompt with REAL data only
-        const prompt = `
-You are a professional trading analyst. Analyze ${symbol} using this REAL market data:
+
+        // Step 4: Create analysis prompt with real data only
+        const prompt = `You are a professional financial analyst. Provide a comprehensive analysis of ${stockData.symbol} using this REAL market data:
 
 CURRENT STOCK DATA:
-- Price: $${stockData.price}
-- Change: ${stockData.changePercent}
+- Symbol: ${stockData.symbol}
+- Current Price: $${stockData.price}
+- Daily Change: ${stockData.changePercent}
 - Volume: ${stockData.volume.toLocaleString()}
-- High: $${stockData.high}
-- Low: $${stockData.low}
+- Day High: $${stockData.high}
+- Day Low: $${stockData.low}
 - Previous Close: $${stockData.previousClose}
-
-${technicalData ? `TECHNICAL INDICATORS:
-- RSI (14): ${technicalData.rsi.toFixed(2)} (${technicalData.rsiSignal})` : ''}
+- Last Updated: ${stockData.lastUpdated}
 
 ${vixData ? `MARKET CONTEXT:
-- VIX: ${vixData.level.toFixed(2)} (${vixData.fearGreed} environment)
-- VIX Change: ${vixData.change > 0 ? '+' : ''}${vixData.change.toFixed(1)}%` : ''}
+- VIX Level: ${vixData.level.toFixed(2)}
+- VIX Change: ${vixData.change > 0 ? '+' : ''}${vixData.change.toFixed(1)}%
+- Market Sentiment: ${vixData.fearGreed}` : ''}
 
-${newsData ? `NEWS SENTIMENT:
-- Overall: ${newsData.overallSentiment}
-- Recent Headlines: ${newsData.articles.map(a => a.title).join('; ')}` : ''}
+ANALYSIS REQUIREMENTS:
+Please provide a detailed analysis including:
 
-MARKET SESSION: ${marketSession}
-CURRENT TIME: ${new Date().toLocaleString()}
+1. **Current Trend Analysis**: Based on the price action and volume
+2. **Support and Resistance Levels**: Calculate specific price levels
+3. **Risk Assessment**: Evaluate current risk factors
+4. **Trading Recommendation**: Buy/Hold/Sell with reasoning
+5. **Price Targets**: Specific entry, stop-loss, and target prices
+6. **Time Horizon**: Short-term (1-5 days) and medium-term (1-4 weeks) outlook
 
-Provide a comprehensive analysis including:
-1. Current market position and trend
-2. Key support and resistance levels
-3. Risk assessment and outlook
-4. Specific entry and exit recommendations
-5. Time horizon for the trade
+Use only the real data provided above. Be specific with price levels and percentages. Format your response clearly with sections.`;
 
-Be specific with price levels and percentages. Base everything on the real data provided.
-`;
+        // Step 5: Get AI Analysis
+        let aiResponse;
+        try {
+            console.log(`[comprehensive-ai-analysis.js] Sending prompt to Gemini AI...`);
+            const result = await model.generateContent(prompt);
+            const response = await result.response;
+            aiResponse = response.text();
+            console.log(`[comprehensive-ai-analysis.js] Received AI analysis (${aiResponse.length} characters)`);
+        } catch (aiError) {
+            console.error(`[comprehensive-ai-analysis.js] AI analysis error: ${aiError.message}`);
+            return {
+                statusCode: 500,
+                headers,
+                body: JSON.stringify({
+                    error: `AI analysis failed: ${aiError.message}`,
+                    analysis: null,
+                    timestamp: new Date().toISOString()
+                })
+            };
+        }
 
-        console.log(`[comprehensive-ai-analysis.js] Sending prompt to Gemini AI...`);
-        
-        // Get AI Analysis
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        const aiAnalysis = response.text();
-        
-        console.log(`[comprehensive-ai-analysis.js] Received AI analysis (${aiAnalysis.length} characters)`);
-        
-        // Structure the response
+        // Step 6: Structure the response
         const analysisResult = {
-            symbol: symbol,
-            analysis: aiAnalysis,
+            symbol: stockData.symbol,
+            analysis: aiResponse,
             marketData: stockData,
-            technicalData: technicalData,
-            newsData: newsData,
             vixData: vixData,
-            marketSession: marketSession,
-            recommendation: extractRecommendation(aiAnalysis),
-            priceTarget: extractPriceTarget(aiAnalysis, stockData.price),
-            riskLevel: assessRiskLevel(stockData, technicalData, vixData),
-            confidence: calculateConfidence(stockData, technicalData, newsData),
+            recommendation: extractRecommendation(aiResponse),
+            priceTarget: extractPriceTarget(aiResponse, stockData.price),
+            riskLevel: assessRiskLevel(stockData, vixData),
+            confidence: calculateConfidence(stockData, vixData),
             timestamp: new Date().toISOString(),
             dataQuality: 'Real-Time',
             dataSource: 'Alpha Vantage + Gemini AI'
         };
-        
+
+        console.log(`[comprehensive-ai-analysis.js] Analysis completed successfully for ${symbol}`);
+
         return {
             statusCode: 200,
             headers,
             body: JSON.stringify({
                 analysis: analysisResult,
-                marketData: marketData,
                 dataQuality: 'Real-Time',
                 timestamp: new Date().toISOString(),
                 dataSource: "Alpha Vantage Real-Time + Gemini AI"
@@ -266,7 +242,7 @@ Be specific with price levels and percentages. Base everything on the real data 
         };
 
     } catch (error) {
-        console.error('[comprehensive-ai-analysis.js] Error:', error);
+        console.error('[comprehensive-ai-analysis.js] Unexpected error:', error);
         
         return {
             statusCode: 500,
@@ -284,6 +260,7 @@ Be specific with price levels and percentages. Base everything on the real data 
 
 // Helper functions for analysis structuring
 function extractRecommendation(analysis) {
+    if (!analysis) return 'Hold';
     const text = analysis.toLowerCase();
     if (text.includes('buy') || text.includes('bullish') || text.includes('long')) {
         return 'Buy';
@@ -295,6 +272,8 @@ function extractRecommendation(analysis) {
 }
 
 function extractPriceTarget(analysis, currentPrice) {
+    if (!analysis || !currentPrice) return 'N/A';
+    
     // Look for price targets in the analysis
     const priceMatches = analysis.match(/\$(\d+\.?\d*)/g);
     if (priceMatches && priceMatches.length > 1) {
@@ -307,47 +286,49 @@ function extractPriceTarget(analysis, currentPrice) {
     return 'N/A';
 }
 
-function assessRiskLevel(stockData, technicalData, vixData) {
+function assessRiskLevel(stockData, vixData) {
+    if (!stockData) return 'Medium';
+    
     let riskScore = 0;
     
     // Volume risk
     if (stockData.volume > 1000000) riskScore += 1;
     
-    // Volatility risk
+    // Volatility risk based on daily range
     const priceRange = (stockData.high - stockData.low) / stockData.price;
     if (priceRange > 0.05) riskScore += 1;
     
-    // Technical risk
-    if (technicalData && (technicalData.rsi > 70 || technicalData.rsi < 30)) riskScore += 1;
-    
-    // Market risk
+    // Market risk from VIX
     if (vixData && vixData.level > 25) riskScore += 1;
+    
+    // Price change risk
+    const changePercent = Math.abs(parseFloat(stockData.changePercent.replace('%', '')));
+    if (changePercent > 3) riskScore += 1;
     
     if (riskScore >= 3) return 'High';
     if (riskScore >= 2) return 'Medium';
     return 'Low';
 }
 
-function calculateConfidence(stockData, technicalData, newsData) {
+function calculateConfidence(stockData, vixData) {
+    if (!stockData) return 50;
+    
     let confidence = 50; // Base confidence
     
     // Volume confirmation
     if (stockData.volume > 500000) confidence += 10;
+    if (stockData.volume > 2000000) confidence += 5;
     
-    // Technical confirmation
-    if (technicalData) {
-        if (technicalData.rsi > 30 && technicalData.rsi < 70) confidence += 15;
+    // Price action clarity
+    const changePercent = Math.abs(parseFloat(stockData.changePercent.replace('%', '')));
+    if (changePercent > 1) confidence += 10;
+    if (changePercent > 3) confidence += 5;
+    
+    // Market environment
+    if (vixData) {
+        if (vixData.level < 20) confidence += 10; // Low volatility = higher confidence
+        if (vixData.level > 30) confidence -= 10; // High volatility = lower confidence
     }
-    
-    // News sentiment
-    if (newsData) {
-        if (newsData.overallSentiment === 'Bullish') confidence += 10;
-        if (newsData.overallSentiment === 'Bearish') confidence -= 5;
-    }
-    
-    // Price action
-    const change = Math.abs(parseFloat(stockData.changePercent.replace('%', '')));
-    if (change > 2) confidence += 10;
     
     return Math.min(95, Math.max(20, confidence));
 }
